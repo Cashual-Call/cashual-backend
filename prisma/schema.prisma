@@ -1,0 +1,122 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id          String    @id @default(uuid())
+  username    String    @unique
+  publicKey   String?   @unique
+  gender      Gender?
+  ipAddress   String?
+  avatarUrl   String?
+  isPro       Boolean   @default(false)
+  proEnd      DateTime?
+  isBanned    Boolean   @default(false)
+  rating      Float     @default(0)
+  ratingCount Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  initiatedCalls     Call[]             @relation("initiator_calls")
+  receivedCalls      Call[]             @relation("receiver_calls")
+  sentTexts          Text[]             @relation("sender_texts")
+  receivedTexts      Text[]             @relation("receiver_texts")
+  userFriendships    Friendship[]       @relation("user_friends")
+  friendFriendships  Friendship[]       @relation("friend_user")
+  reportsMade        Report[]           @relation("reporter")
+  reportsReceived    Report[]           @relation("reported_user")
+  leaderboardEntries LeaderboardEntry[]
+  subscriptions      Subscription[]
+}
+
+model Call {
+  id               String   @id @default(uuid())
+  initiatorId      String
+  receiverId       String
+  durationSec      Int
+  startedAt        DateTime
+  endedAt          DateTime
+  ratedByInitiator Int?
+  ratedByReceiver  Int?
+
+  // Relations
+  initiator User @relation("initiator_calls", fields: [initiatorId], references: [id])
+  receiver  User @relation("receiver_calls", fields: [receiverId], references: [id])
+}
+
+model Text {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  sentAt     DateTime @default(now())
+
+  // Relations
+  sender   User @relation("sender_texts", fields: [senderId], references: [id])
+  receiver User @relation("receiver_texts", fields: [receiverId], references: [id])
+}
+
+model Friendship {
+  id        String   @id @default(uuid())
+  userId    String
+  friendId  String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user   User @relation("user_friends", fields: [userId], references: [id])
+  friend User @relation("friend_user", fields: [friendId], references: [id])
+
+  @@unique([userId, friendId])
+}
+
+model Report {
+  id             String   @id @default(uuid())
+  reporterId     String
+  reportedUserId String
+  reason         String
+  createdAt      DateTime @default(now())
+
+  // Relations
+  reporter     User @relation("reporter", fields: [reporterId], references: [id])
+  reportedUser User @relation("reported_user", fields: [reportedUserId], references: [id])
+}
+
+model LeaderboardEntry {
+  id       String   @id @default(uuid())
+  userId   String
+  date     DateTime
+  score    Float
+  eligible Boolean  @default(true)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  userId    String
+  plan      Plan
+  startedAt DateTime @default(now())
+  expiresAt DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+enum Plan {
+  MONTHLY
+  YEARLY
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
