@@ -6,7 +6,7 @@ import { setupCallHandlers } from './call';
 
 export function setupWebSocketHandlers(io: Server, redis: Redis) {
   // Initialize all WebSocket handlers
-  setupChatHandlers(io, redis);
+  setupChatHandlers(io);
   setupSearchHandlers(io, redis);
   setupCallHandlers(io, redis);
 

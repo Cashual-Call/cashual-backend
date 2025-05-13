@@ -16,9 +16,9 @@ declare global {
   }
 }
 
-export const generateToken = (obj: object): string => {
+export const generateToken = (obj: UserJWTPayload): string => {
   const options: SignOptions = { expiresIn: '24h' };
-  return jwt.sign({ ...obj }, config.jwt.secret, options);
+  return jwt.sign(obj, config.jwt.secret, options);
 };
 
 export const verifyToken = (

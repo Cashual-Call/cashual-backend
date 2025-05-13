@@ -10,7 +10,8 @@ generator client {
 model User {
   id          String    @id @default(uuid())
   username    String    @unique
-  publicKey   String?   @unique
+  publicKey   String   @unique
+  walletAddress String @unique
   gender      Gender?
   ipAddress   String?
   avatarUrl   String?
@@ -33,6 +34,8 @@ model User {
   reportsReceived    Report[]           @relation("reported_user")
   leaderboardEntries LeaderboardEntry[]
   subscriptions      Subscription[]
+  chatRooms1         ChatRoom[]         @relation("user1_chats")
+  chatRooms2         ChatRoom[]         @relation("user2_chats")
 }
 
 model Call {
@@ -56,10 +59,12 @@ model Text {
   receiverId String
   content    String
   sentAt     DateTime @default(now())
+  chatRoomId String
 
   // Relations
   sender   User @relation("sender_texts", fields: [senderId], references: [id])
   receiver User @relation("receiver_texts", fields: [receiverId], references: [id])
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id])
 }
 
 model Friendship {
@@ -109,6 +114,21 @@ model Subscription {
 
   // Relations
   user User @relation(fields: [userId], references: [id])
+}
+
+model ChatRoom {
+  id        String   @id @default(uuid())
+  userId1   String
+  userId2   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user1     User  @relation("user1_chats", fields: [userId1], references: [id])
+  user2     User  @relation("user2_chats", fields: [userId2], references: [id])
+  messages  Text[]
+
+  @@unique([userId1, userId2])
 }
 
 enum Plan {

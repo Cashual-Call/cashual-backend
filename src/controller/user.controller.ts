@@ -1,239 +1,222 @@
 import { Request, Response } from "express";
-import { prisma } from "../lib/prisma";
-import { Prisma } from "@prisma/client";
+import { UserService } from "../service/user.service";
+import { redis } from "../lib/redis";
 
-type Gender = "MALE" | "FEMALE";
+export class UserController {
+  private userService: UserService;
+  private readonly CACHE_TTL = 3600;
 
-export const createUser = async (req: Request, res: Response) => {
-  try {
-    const { username, publicKey, gender, ipAddress, avatarUrl } = req.body;
+  constructor() {
+    this.userService = new UserService();
 
-    const userData = {
-      username,
-      gender: gender as Gender | null,
-      ipAddress,
-      avatarUrl,
-      publicKey: publicKey || null,
-    } as const;
+    this.createUser = this.createUser.bind(this);
+    this.getUserById = this.getUserById.bind(this);
+    this.getAllUsers = this.getAllUsers.bind(this);
+    this.updateUser = this.updateUser.bind(this);
+    this.deleteUser = this.deleteUser.bind(this);
+  }
 
-    const user = await prisma.user.create({
-      data: userData,
-    });
-
-    res.status(201).json(user);
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2002") {
-        res
-          .status(400)
-          .json({ error: "Username or public key already exists" });
+  createUser = async (req: Request, res: Response) => {
+    try {
+      const {
+        username,
+        publicKey,
+        gender,
+        ipAddress,
+        avatarUrl,
+        walletAddress,
+      } = req.body;
+      const user = await this.userService.createUser({
+        username,
+        publicKey,
+        gender,
+        ipAddress,
+        avatarUrl,
+        walletAddress,
+      });
+      
+      // Invalidate users list cache
+      await redis.del('users:all');
+      
+      res.status(201).json(user);
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === "Username or public key already exists") {
+          res.status(400).json({ error: error.message });
+        } else {
+          res.status(500).json({ error: "Failed to create user" });
+        }
       } else {
         res.status(500).json({ error: "Failed to create user" });
       }
-    } else {
-      res.status(500).json({ error: "Failed to create user" });
     }
-  }
-};
+  };
 
-// Get user by ID
-export const getUserById = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const user = await prisma.user.findUnique({
-      where: { id },
-      include: {
-        initiatedCalls: true,
-        receivedCalls: true,
-        sentTexts: true,
-        receivedTexts: true,
-        userFriendships: {
-          include: {
-            friend: true,
-          },
-        },
-        friendFriendships: {
-          include: {
-            user: true,
-          },
-        },
-      },
-    });
+  getUserById = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Try to get from cache first
+      const cachedUser = await redis.get(`user:${id}`);
+      if (cachedUser) {
+        return res.json(JSON.parse(cachedUser));
+      }
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      const user = await this.userService.getUserById(id);
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Cache the user data
+      await redis.setex(`user:${id}`, this.CACHE_TTL, JSON.stringify(user));
+
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
     }
+  };
 
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch user" });
-  }
-};
+  getAllUsers = async (req: Request, res: Response) => {
+    try {
+      // Try to get from cache first
+      const cachedUsers = await redis.get('users:all');
+      if (cachedUsers) {
+        return res.json(JSON.parse(cachedUsers));
+      }
 
-// Get all users
-export const getAllUsers = async (req: Request, res: Response) => {
-  try {
-    const users = await prisma.user.findMany({
-      include: {
-        initiatedCalls: true,
-        receivedCalls: true,
-        sentTexts: true,
-        receivedTexts: true,
-      },
-    });
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch users" });
-  }
-};
+      const users = await this.userService.getAllUsers();
+      
+      // Cache the users list
+      await redis.setex('users:all', this.CACHE_TTL, JSON.stringify(users));
+      
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  };
 
-// Update user
-export const updateUser = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { username, publicKey, gender, avatarUrl, isPro, proEnd } = req.body;
+  updateUser = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { username, publicKey, gender, avatarUrl, isPro, proEnd } = req.body;
 
-    const userData = {
-      username,
-      gender: gender as Gender | null,
-      avatarUrl,
-      isPro,
-      proEnd: proEnd ? new Date(proEnd) : undefined,
-      publicKey: publicKey || undefined,
-    } as const;
+      const user = await this.userService.updateUser(id, {
+        username,
+        publicKey,
+        gender,
+        avatarUrl,
+        isPro,
+        proEnd: proEnd ? new Date(proEnd) : undefined,
+      });
 
-    const user = await prisma.user.update({
-      where: { id },
-      data: userData,
-    });
+      // Invalidate caches
+      await Promise.all([
+        redis.del(`user:${id}`),
+        redis.del('users:all')
+      ]);
 
-    res.json(user);
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2002") {
-        res
-          .status(400)
-          .json({ error: "Username or public key already exists" });
-      } else if (error.code === "P2025") {
-        res.status(404).json({ error: "User not found" });
+      res.json(user);
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === "Username or public key already exists") {
+          res.status(400).json({ error: error.message });
+        } else if (error.message === "User not found") {
+          res.status(404).json({ error: error.message });
+        } else {
+          res.status(500).json({ error: "Failed to update user" });
+        }
       } else {
         res.status(500).json({ error: "Failed to update user" });
       }
-    } else {
-      res.status(500).json({ error: "Failed to update user" });
     }
-  }
-};
+  };
 
-// Delete user
-export const deleteUser = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
+  deleteUser = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await this.userService.deleteUser(id);
+      
+      // Invalidate caches
+      await Promise.all([
+        redis.del(`user:${id}`),
+        redis.del('users:all')
+      ]);
+      
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  };
 
-    // Delete all related records first
-    await prisma.$transaction([
-      prisma.call.deleteMany({
-        where: {
-          OR: [{ initiatorId: id }, { receiverId: id }],
-        },
-      }),
-      prisma.text.deleteMany({
-        where: {
-          OR: [{ senderId: id }, { receiverId: id }],
-        },
-      }),
-      prisma.friendship.deleteMany({
-        where: {
-          OR: [{ userId: id }, { friendId: id }],
-        },
-      }),
-      prisma.report.deleteMany({
-        where: {
-          OR: [{ reporterId: id }, { reportedUserId: id }],
-        },
-      }),
-      prisma.leaderboardEntry.deleteMany({
-        where: { userId: id },
-      }),
-      prisma.subscription.deleteMany({
-        where: { userId: id },
-      }),
-      prisma.user.delete({
-        where: { id },
-      }),
-    ]);
+  toggleBanUser = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { isBanned } = req.body;
 
-    res.status(204).send();
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete user" });
-  }
-};
-
-// Ban/Unban user
-export const toggleBanUser = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { isBanned } = req.body;
-
-    const userData = {
-      isBanned: Boolean(isBanned),
-    } as const;
-
-    const user = await prisma.user.update({
-      where: { id },
-      data: userData,
-    });
-
-    res.json(user);
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2025") {
-        res.status(404).json({ error: "User not found" });
+      const user = await this.userService.toggleBanUser(id, Boolean(isBanned));
+      
+      // Invalidate caches
+      await Promise.all([
+        redis.del(`user:${id}`),
+        redis.del('users:all')
+      ]);
+      
+      res.json(user);
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === "User not found") {
+          res.status(404).json({ error: error.message });
+        } else {
+          res.status(500).json({ error: "Failed to update user ban status" });
+        }
       } else {
         res.status(500).json({ error: "Failed to update user ban status" });
       }
-    } else {
-      res.status(500).json({ error: "Failed to update user ban status" });
     }
-  }
-};
+  };
 
-export const getAvailableAvatars = async (req: Request, res: Response) => {
-  const AVATAR_OPTIONS = [
-    {
-      id: "avatar1",
-      src: "https://avatars.githubusercontent.com/u/124599?v=4",
-      fallback: "A1",
-    },
-    {
-      id: "avatar2",
-      src: "https://avatars.githubusercontent.com/u/124599?v=4",
-      fallback: "A2",
-    },
-    {
-      id: "avatar3",
-      src: "https://avatars.githubusercontent.com/u/124599?v=4",
-      fallback: "A3",
-    },
-  ];
+  getAvailableAvatars = async (req: Request, res: Response) => {
+    try {
+      // Try to get from cache first
+      const cachedAvatars = await redis.get('avatars:all');
+      if (cachedAvatars) {
+        return res.json(JSON.parse(cachedAvatars));
+      }
 
-  res.json(AVATAR_OPTIONS);
-};
-
-export const checkUsernameAvailability = async (req: Request, res: Response) => {
-  try {
-    const { username } = req.query;
-
-    if (!username || typeof username !== 'string') {
-      return res.status(400).json({ error: 'Username is required' });
+      const avatars = this.userService.getAvailableAvatars();
+      
+      // Cache the avatars list
+      await redis.setex('avatars:all', this.CACHE_TTL, JSON.stringify(avatars));
+      
+      res.json(avatars);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch avatars" });
     }
+  };
 
-    const existingUser = await prisma.user.findUnique({
-      where: { username },
-    });
+  checkUsernameAvailability = async (req: Request, res: Response) => {
+    try {
+      const { username } = req.query;
 
-    res.json({ available: !existingUser });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to check username availability' });
-  }
-};
+      if (!username || typeof username !== "string") {
+        return res.status(400).json({ error: "Username is required" });
+      }
+
+      // Try to get from cache first
+      const cachedResult = await redis.get(`username:${username}`);
+      if (cachedResult) {
+        return res.json({ available: JSON.parse(cachedResult) });
+      }
+
+      const available = await this.userService.checkUsernameAvailability(username);
+      
+      // Cache the result with a shorter TTL since this is more time-sensitive
+      await redis.setex(`username:${username}`, 300, JSON.stringify(available));
+      
+      res.json({ available });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check username availability" });
+    }
+  };
+}

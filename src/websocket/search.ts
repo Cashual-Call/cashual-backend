@@ -40,13 +40,13 @@ export function setupSearchHandlers(io: Server, redis: Redis) {
           where: {
             OR: [
               { username: { contains: query, mode: 'insensitive' } },
-              { email: { contains: query, mode: 'insensitive' } }
+              // { email: { contains: query, mode: 'insensitive' } }
             ]
           },
           select: {
             id: true,
             username: true,
-            email: true,
+            // email: true,
             avatarUrl: true
           },
           take: 10
@@ -57,7 +57,7 @@ export function setupSearchHandlers(io: Server, redis: Redis) {
           type: 'user' as const,
           content: user.username || '',
           metadata: {
-            email: user.email,
+            // email: user.email,
             avatar: user.avatarUrl
           }
         })));

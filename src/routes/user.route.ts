@@ -1,19 +1,15 @@
 import { Router, RequestHandler } from "express";
-import {
-  createUser,
-  getUserById,
-  getAllUsers,
-  updateUser,
-  deleteUser,
-  toggleBanUser,
-  getAvailableAvatars,
-  checkUsernameAvailability,
-} from "../controller/user.controller";
+import { UserController } from "../controller/user.controller";
+
+const userController = new UserController();
 
 const router = Router();
 
-router.get("/avatars", getAvailableAvatars as RequestHandler);
-router.get("/check-username", checkUsernameAvailability as RequestHandler);
+router.get("/avatars", userController.getAvailableAvatars as RequestHandler);
+router.get(
+  "/check-username",
+  userController.checkUsernameAvailability as RequestHandler
+);
 
 // Create a new user
 // router.post("/", createUser as RequestHandler);

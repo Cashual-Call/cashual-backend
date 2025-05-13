@@ -14,6 +14,8 @@ import { pubClient, subClient } from "./lib/redis";
 import { prisma } from "./lib/prisma";
 import { validateResponse } from "./middleware/validate.middleware";
 import userRouter from "./routes/user.route";
+import historyRouter from "./routes/history.route";
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -60,6 +62,7 @@ app.use(
 // Use routes
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/history", historyRouter);
 
 app.use(
   (
