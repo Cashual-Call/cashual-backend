@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { config } from '../config';
 
-interface UserJWTPayload {
+export interface UserJWTPayload {
   publicKey: string;
   walletAddress?: string;
   username?: string;

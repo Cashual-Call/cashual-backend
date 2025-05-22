@@ -1,13 +1,13 @@
 import { Server } from 'socket.io';
 import Redis from 'ioredis';
 import { setupChatHandlers } from './chat';
-import { setupSearchHandlers } from './search';
+// import { setupSearchHandlers } from './search';
 import { setupCallHandlers } from './call';
 
 export function setupWebSocketHandlers(io: Server, redis: Redis) {
   // Initialize all WebSocket handlers
   setupChatHandlers(io);
-  setupSearchHandlers(io, redis);
+  // setupSearchHandlers(io, redis);
   setupCallHandlers(io, redis);
 
   // Global error handling

@@ -1,6 +1,6 @@
 import ChatRoomService from "./chat-room.service";
 import { messageQueue } from "../lib/queue";
-
+import { v4 as uuidv4 } from "uuid";
 export default class ChatDBService {
   private chatRoomService: ChatRoomService;
 
@@ -20,20 +20,26 @@ export default class ChatDBService {
       throw new Error("Chat room not found");
     }
 
-    const job = await messageQueue.add({
+    const messageObj = {
+      id: uuidv4(),
       content: message,
       senderId,
       receiverId,
       chatRoomId,
-    });
+      timestamp: new Date().toISOString(),
+    }
 
-    const result = await job.finished();
-    return result;
+    await messageQueue.add('processMessage', messageObj);
+
+    // Wait for job completion and return result
+    return messageObj;
   }
 
   private async getQueuedMessages(chatRoomId: string) {
-    const jobs = await messageQueue.getJobs(['waiting', 'active']);
-    return jobs
+    // Get jobs in waiting and active states
+    const waitingJobs = await messageQueue.getJobs(['waiting', 'active']);
+    
+    return waitingJobs
       .filter(job => job.data.chatRoomId === chatRoomId)
       .map(job => ({
         id: job.id,

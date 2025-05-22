@@ -2,6 +2,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
+import { instrument } from "@socket.io/admin-ui";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -15,6 +16,10 @@ import { prisma } from "./lib/prisma";
 import { validateResponse } from "./middleware/validate.middleware";
 import userRouter from "./routes/user.route";
 import historyRouter from "./routes/history.route";
+import socketAuthMiddleware from "./middleware/socket.middleware";
+import uploadRouter from "./routes/upload.route";
+import { addRecurringJob } from "./cron/match.cron";
+import searchRouter from "./routes/search.route";
 
 const app = express();
 const httpServer = createServer(app);
@@ -28,6 +33,14 @@ const io = new Server(httpServer, {
     credentials: true,
   },
 });
+
+instrument(io, {
+  auth: false,
+  mode: "development",
+});
+
+// Start the recurring job
+addRecurringJob().catch(console.error);
 
 // Set up Redis adapter for Socket.IO
 Promise.all([pubClient, subClient]).then(([pub, sub]) => {
@@ -62,7 +75,9 @@ app.use(
 // Use routes
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/search", searchRouter);
 app.use("/api/v1/history", historyRouter);
+app.use("/api/v1/upload", uploadRouter);
 
 app.use(
   (

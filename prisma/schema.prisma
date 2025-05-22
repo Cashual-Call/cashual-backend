@@ -15,6 +15,7 @@ model User {
   gender      Gender?
   ipAddress   String?
   avatarUrl   String?
+  interests   String[]
   isPro       Boolean   @default(false)
   proEnd      DateTime?
   isBanned    Boolean   @default(false)
