@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { MatchService } from "../service/match.service";
+import { verifyUserId } from "../utils/user-id";
 
 export class SearchController {
   private matchService: MatchService;
@@ -17,6 +18,12 @@ export class SearchController {
 
     if (!userId) {
       throw new Error("User ID is required");
+    }
+
+    const user = await verifyUserId(userId);
+
+    if (!user) {
+      throw new Error("User is Not Validated");
     }
 
     await this.matchService.addUser(userId, []);
@@ -46,12 +53,11 @@ export class SearchController {
     }
 
     const match = await this.matchService.getMatchedJWT(userId);
-    
+
     if (!match) {
       return res.status(404).json({ message: "No match found" });
     }
-
-    res.status(200).json(match);
+    res.status(200).json({ data: match, message: "Match found" });
     return;
   }
 }

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { UserService } from "../service/user.service";
 import { redis } from "../lib/redis";
+import { getUserId, verifyUserId } from "../utils/user-id";
 
 export class UserController {
   private userService: UserService;
@@ -219,4 +220,18 @@ export class UserController {
       res.status(500).json({ error: "Failed to check username availability" });
     }
   };
+
+  getUserId = async (req: Request, res: Response) => {
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    const userId = getUserId(ipAddress);
+    console.log(ipAddress);
+    res.json({ userId, ipAddress });
+  }
+
+  verifyUserId = async (req: Request, res: Response) => {
+    const { userId } = req.body;
+    const isValid = verifyUserId(userId);
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    res.json({ isValid, ipAddress });
+  }
 }

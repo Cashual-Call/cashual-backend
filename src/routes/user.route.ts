@@ -10,6 +10,8 @@ router.get(
   "/check-username",
   userController.checkUsernameAvailability as RequestHandler
 );
+router.get("/user-id", userController.getUserId as RequestHandler);
+router.post("/user-id", userController.verifyUserId as RequestHandler);
 
 // Create a new user
 // router.post("/", createUser as RequestHandler);

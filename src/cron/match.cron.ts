@@ -1,24 +1,16 @@
-import { Queue, Worker } from 'bullmq';
+import { Worker } from 'bullmq';
 import { redis as connection } from '../lib/redis';
-import { AvailableUserService } from '../service/available-user.service';
 import { MatchService } from '../service/match.service';
+import { matchQueue } from '../lib/queue';
 
-const availableUserService = new AvailableUserService("chat");
 const matchService = new MatchService("chat");
 
 // Create a queue
-const matchQueue = new Queue('match-queue', { connection });
-
 // Create a worker to process jobs
 const worker = new Worker(
   'match-queue',
   async (job) => {
-    // const availableUsers = await availableUserService.getAvailableUsers();
-    // TODO: implement match logic
-    // matchService.setMatch(availableUsers[0].userId, availableUsers[1].userId);
-
-
-    // console.log(`Processing job ${job.id} at ${new Date().toISOString()}`);
+    await matchService.bestMatch();
   },
   { connection }
 );
@@ -38,7 +30,7 @@ export const addRecurringJob = async () => {
 
 // Handle worker events
 worker.on('completed', (job) => {
-  console.log(`Job ${job.id} completed`);
+//   console.log(`Job ${job.id} completed`);
 });
 
 worker.on('failed', (job, err) => {

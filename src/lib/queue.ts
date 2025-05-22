@@ -7,9 +7,12 @@ export const messageQueue = new Queue("chat-messages", { connection });
 
 export const availableUserQueue = new Queue("available-users", { connection });
 
+export const matchQueue = new Queue("match-queue", { connection });
+
 // Create queue events
 const messageQueueEvents = new QueueEvents("chat-messages", { connection });
 
+// TODO: HANDLE CODE IN DIFFERENT FILES
 // Process messages
 const messageWorker = new Worker(
   "chat-messages",
