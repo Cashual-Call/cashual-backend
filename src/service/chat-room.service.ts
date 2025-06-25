@@ -1,134 +1,154 @@
 import { prisma } from "../lib/prisma";
 import { redis } from "../lib/redis";
+import { RoomType } from "@prisma/client";
 
-export default class ChatRoomService {
+export default class RoomService {
+  private readonly roomType: RoomType = RoomType.CHAT;
+
   private readonly CACHE_TTL = 60 * 60 * 24;
-  private readonly CHAT_ROOM_KEY_PREFIX = "chat_room:";
-  private readonly USER_CHAT_ROOMS_KEY_PREFIX = "user_chat_rooms:";
+  private readonly ROOM_KEY_PREFIX = `${this.roomType}_room:`;
+  private readonly USER_ROOMS_KEY_PREFIX = `${this.roomType}_rooms:`;
   private readonly LAST_MESSAGE_KEY_PREFIX = "last_message:";
 
+  constructor(roomType: RoomType = RoomType.CHAT) {
+    this.roomType = roomType;
+  }
+
   // Helper method to generate Redis key for a chat room
-  private getChatRoomKey(id: string): string {
-    return `${this.CHAT_ROOM_KEY_PREFIX}${id}`;
+  private getRoomKey(id: string): string {
+    return `${this.ROOM_KEY_PREFIX}${id}`;
   }
 
   // Helper method to generate Redis key for user's chat rooms
-  private getUserChatRoomsKey(userId: string): string {
-    return `${this.USER_CHAT_ROOMS_KEY_PREFIX}${userId}`;
+  private getUserRoomsKey(userId: string): string {
+    return `${this.USER_ROOMS_KEY_PREFIX}${userId}`;
   }
 
   // Helper method to generate Redis key for the last message in a chat room
-  private getLastMessageKey(chatRoomId: string): string {
-    return `${this.LAST_MESSAGE_KEY_PREFIX}${chatRoomId}`;
+  private getLastMessageKey(roomId: string): string {
+    return `${this.LAST_MESSAGE_KEY_PREFIX}${roomId}`;
   }
 
-  async createChatRoom(userId1: string, userId2: string) {
-    const chatRoom = await prisma.chatRoom.create({
-      data: {
-        userId1,
-        userId2,
-      },
-    });
+  async createRoom(
+    user1Id: string,
+    user2Id: string,
+    isUser1Anonymous: boolean = true,
+    isUser2Anonymous: boolean = true
+  ) {
+    try {
+      const room = await prisma.room.create({
+        data: {
+          anonUser1Id: user1Id,
+          anonUser2Id: user2Id,
+          user1Id: isUser1Anonymous ? null : user1Id,
+          user2Id: isUser2Anonymous ? null : user2Id,
+          type: this.roomType as RoomType,
+        },
+      });
 
-    // Cache the new chat room
-    await redis.set(
-      this.getChatRoomKey(chatRoom.id),
-      JSON.stringify(chatRoom),
-      "EX",
-      this.CACHE_TTL
-    );
+      // Cache the new chat room
+      await redis.set(
+        this.getRoomKey(room.id),
+        JSON.stringify(room),
+        "EX",
+        this.CACHE_TTL
+      );
 
-    // Invalidate user chat rooms cache for both users
-    await redis.del(this.getUserChatRoomsKey(userId1));
-    await redis.del(this.getUserChatRoomsKey(userId2));
+      // Invalidate user chat rooms cache for both users
+      await redis.del(this.getUserRoomsKey(user1Id));
+      await redis.del(this.getUserRoomsKey(user2Id));
 
-    return chatRoom;
+      return room;
+    } catch (error) {
+      console.error("Error creating chat room:", error);
+      throw error;
+    }
   }
 
-  async getChatRoom(id: string) {
+  async getRoom(id: string) {
     // Try to get from cache first
-    const cachedChatRoom = await redis.get(this.getChatRoomKey(id));
-    
-    if (cachedChatRoom) {
-      return JSON.parse(cachedChatRoom);
+    const cachedroom = await redis.get(this.getRoomKey(id));
+
+    if (cachedroom) {
+      return JSON.parse(cachedroom);
     }
 
     // If not in cache, fetch from database
-    const chatRoom = await prisma.chatRoom.findUnique({
+    const room = await prisma.room.findUnique({
       where: {
         id,
       },
     });
 
     // Cache the result if found
-    if (chatRoom) {
+    if (room) {
       await redis.set(
-        this.getChatRoomKey(id),
-        JSON.stringify(chatRoom),
+        this.getRoomKey(id),
+        JSON.stringify(room),
         "EX",
         this.CACHE_TTL
       );
     }
 
-    return chatRoom;
+    return room;
   }
 
-  async getChatRoomByUserId(userId: string) {
+  async getroomByUserId(userId: string) {
     // Try to get from cache first
-    const cachedChatRooms = await redis.get(this.getUserChatRoomsKey(userId));
-    
-    if (cachedChatRooms) {
-      return JSON.parse(cachedChatRooms);
+    const cachedrooms = await redis.get(this.getUserRoomsKey(userId));
+
+    if (cachedrooms) {
+      return JSON.parse(cachedrooms);
     }
 
     // If not in cache, fetch from database
-    const chatRooms = await prisma.chatRoom.findMany({
+    const rooms = await prisma.room.findMany({
       where: {
-        OR: [{ userId1: userId }, { userId2: userId }],
+        OR: [{ user1Id: userId }, { user2Id: userId }],
       },
     });
 
     // Cache the result
     await redis.set(
-      this.getUserChatRoomsKey(userId),
-      JSON.stringify(chatRooms),
+      this.getUserRoomsKey(userId),
+      JSON.stringify(rooms),
       "EX",
       this.CACHE_TTL
     );
 
-    return chatRooms;
+    return rooms;
   }
 
-  async getChatRoomByUsers(userId1: string, userId2: string) {
+  async getroomByUsers(user1Id: string, user2Id: string) {
     // For this method, we'll query the database directly as it's a specific lookup
     // that would be inefficient to cache separately
-    const chatRoom = await prisma.chatRoom.findFirst({
+    const room = await prisma.room.findFirst({
       where: {
         OR: [
-          { userId1, userId2 },
-          { userId1: userId2, userId2: userId1 }
-        ]
+          { user1Id, user2Id },
+          { user1Id: user2Id, user2Id: user1Id },
+        ],
       },
     });
 
     // If found, cache the chat room
-    if (chatRoom) {
+    if (room) {
       await redis.set(
-        this.getChatRoomKey(chatRoom.id),
-        JSON.stringify(chatRoom),
+        this.getRoomKey(room.id),
+        JSON.stringify(room),
         "EX",
         this.CACHE_TTL
       );
     }
 
-    return chatRoom;
+    return room;
   }
 
   // TODO: This is not working as expected
-  async getLastMessage(chatRoomId: string) {
+  async getLastMessage(roomId: string) {
     // Try to get from cache first
-    const cachedLastMessage = await redis.get(this.getLastMessageKey(chatRoomId));
-    
+    const cachedLastMessage = await redis.get(this.getLastMessageKey(roomId));
+
     if (cachedLastMessage) {
       return JSON.parse(cachedLastMessage);
     }
@@ -136,7 +156,7 @@ export default class ChatRoomService {
     // If not in cache, fetch from database
     const lastMessage = await prisma.text.findFirst({
       where: {
-        chatRoomId,
+        roomId,
       },
       orderBy: {
         sentAt: "desc",
@@ -146,7 +166,7 @@ export default class ChatRoomService {
     // Cache the result if found
     if (lastMessage) {
       await redis.set(
-        this.getLastMessageKey(chatRoomId),
+        this.getLastMessageKey(roomId),
         JSON.stringify(lastMessage),
         "EX",
         this.CACHE_TTL
@@ -156,10 +176,10 @@ export default class ChatRoomService {
     return lastMessage;
   }
 
-  async getMessages(chatRoomId: string, limit: number = 50, cursor?: string) {
+  async getMessages(roomId: string, limit: number = 50, cursor?: string) {
     // Try to get from cache first
-    const cachedMessages = await redis.get(this.getMessagesKey(chatRoomId));
-    
+    const cachedMessages = await redis.get(this.getMessagesKey(roomId));
+
     if (cachedMessages) {
       return JSON.parse(cachedMessages);
     }
@@ -167,7 +187,7 @@ export default class ChatRoomService {
     // If not in cache, fetch from database
     const messages = await prisma.text.findMany({
       where: {
-        chatRoomId,
+        roomId,
       },
       orderBy: {
         sentAt: "desc",
@@ -184,7 +204,7 @@ export default class ChatRoomService {
     // Cache the result if found
     if (messages.length > 0) {
       await redis.set(
-        this.getMessagesKey(chatRoomId),
+        this.getMessagesKey(roomId),
         JSON.stringify(messages),
         "EX",
         this.CACHE_TTL
@@ -194,19 +214,19 @@ export default class ChatRoomService {
     return messages;
   }
 
-  private getMessagesKey(chatRoomId: string): string {
-    return `chat:messages:${chatRoomId}`;
+  private getMessagesKey(roomId: string): string {
+    return `chat:messages:${roomId}`;
   }
 
   // Method to invalidate cache when a new message is added
-  async invalidateLastMessageCache(chatRoomId: string) {
-    await redis.del(this.getLastMessageKey(chatRoomId));
+  async invalidateLastMessageCache(roomId: string) {
+    await redis.del(this.getLastMessageKey(roomId));
   }
 
   // Method to update cache when a message is sent
-  async updateLastMessageCache(chatRoomId: string, message: any) {
+  async updateLastMessageCache(roomId: string, message: any) {
     await redis.set(
-      this.getLastMessageKey(chatRoomId),
+      this.getLastMessageKey(roomId),
       JSON.stringify(message),
       "EX",
       this.CACHE_TTL

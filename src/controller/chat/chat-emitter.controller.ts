@@ -1,59 +1,64 @@
-import { Socket } from "socket.io";
-import { redis, subClient } from "../../lib/redis";
-import { sendMessageSchema, Message } from "../../validation/chat.validation";
+import { Server, Namespace } from "socket.io";
+import { subClient } from "../../lib/redis";
 import { ChatEvent } from "../../config/websocket";
-import ChatDBService from "../../service/chat-db.service";
+import { RedisHash } from "../../config/redis-hash";
+import { Message } from "../../validation/chat.validation";
 
 export class ChatEmitterController {
-  private socket: Socket;
+  private server: Server | Namespace;
 
-  constructor(socket: Socket) {
-    this.socket = socket;
+  constructor(server: Server | Namespace) {
+    this.server = server;
     this.handleRoomEvent = this.handleRoomEvent.bind(this);
+    this.handleChatMessage = this.handleChatMessage.bind(this);
   }
 
   initializeSubscriptions() {
-    console.log("Initializing subscriptions");
-    // Subscribe to room events
-    subClient.subscribe("room:events", (err) => {
+    // Subscribe to chat messages
+    subClient.subscribe(RedisHash.CHAT_MESSAGES, (err, count) => {
       if (err) {
-        console.error("Error subscribing to room events:", err);
+        console.error("Subscribe error:", err);
         return;
       }
+      console.log(`Subscribed to ${count} channel(s)`);
     });
-
-    // Handle incoming room events
-    subClient.on("message", (channel: string, message: string) => {
-      if (channel === "room:events") {
+    
+    subClient.on("message", (channel: string, message: any) => {
+      if (channel === RedisHash.CHAT_MESSAGES) {
         try {
-          const event: RoomEvent = JSON.parse(message);
-          this.handleRoomEvent(event);
+          const chatMessage: Message = JSON.parse(message);
+          
+          this.handleChatMessage(chatMessage);
         } catch (error) {
-          console.error("Error parsing room event:", error);
+          console.error("Error parsing chat message:", error);
         }
       }
     });
   }
 
+  private handleChatMessage(message: Message) {
+    this.server.to(message.roomId).emit(ChatEvent.MESSAGE, message);
+  }
+
   private handleRoomEvent(event: RoomEvent) {
     switch (event.type) {
       case "join":
-        this.socket.to(event.roomId).emit(ChatEvent.USER_JOINED, event);
+        this.server.to(event.roomId).emit(ChatEvent.USER_JOINED, event);
         break;
       case "leave":
-        this.socket.to(event.roomId).emit(ChatEvent.USER_LEFT, event);
+        this.server.to(event.roomId).emit(ChatEvent.USER_LEFT, event);
         break;
       case "typing":
-        this.socket.to(event.roomId).emit(ChatEvent.USER_TYPING, event);
+        this.server.to(event.roomId).emit(ChatEvent.USER_TYPING, event);
         break;
       case "stopped_typing":
-        this.socket.to(event.roomId).emit(ChatEvent.USER_STOPPED_TYPING, event);
+        this.server.to(event.roomId).emit(ChatEvent.USER_STOPPED_TYPING, event);
         break;
       case "connected":
-        this.socket.to(event.roomId).emit(ChatEvent.USER_CONNECTED, event);
+        this.server.to(event.roomId).emit(ChatEvent.USER_CONNECTED, event);
         break;
       case "disconnected":
-        this.socket.to(event.roomId).emit(ChatEvent.USER_DISCONNECTED, event);
+        this.server.to(event.roomId).emit(ChatEvent.USER_DISCONNECTED, event);
         break;
       default:
         console.warn("Unknown room event type:", event.type);

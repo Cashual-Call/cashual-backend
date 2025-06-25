@@ -17,15 +17,18 @@ const messageQueueEvents = new QueueEvents("chat-messages", { connection });
 const messageWorker = new Worker(
   "chat-messages",
   async (job) => {
-    const { content, senderId, receiverId, chatRoomId } = job.data;
+    const { content, senderId, receiverId, roomId } = job.data;
 
     try {
       const message = await prisma.text.create({
         data: {
           content,
-          senderId,
-          receiverId,
-          chatRoomId,
+          // TODO: Handle this
+          // senderId,
+          // receiverId,
+          roomId,
+          senderAnonId: senderId,
+          receiverAnonId: receiverId,
         },
       });
 

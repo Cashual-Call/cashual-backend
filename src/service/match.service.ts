@@ -2,7 +2,7 @@ import { AvailableUserService } from "./available-user.service";
 import { redis } from "../lib/redis";
 import { generateToken } from "../middleware/socket.middleware";
 import { v4 as uuidv4 } from "uuid";
-
+import ChatRoomService from "./chat-room.service";
 interface MatchPayload {
   userId: string;
   roomId: string;
@@ -12,14 +12,17 @@ interface MatchPayload {
 export class MatchService {
   private searchType: string;
   private availableUserService: AvailableUserService;
+  private chatRoomService: ChatRoomService;
 
   constructor(searchType: string) {
     this.searchType = searchType;
     this.availableUserService = new AvailableUserService(searchType);
+    this.chatRoomService = new ChatRoomService();
   }
 
   async addUser(userId: string, interests: string[]) {
-    await this.availableUserService.addUser(userId, interests);
+    const user = await this.availableUserService.addUser(userId, interests);
+    return user;
   }
 
   async removeUser(userId: string) {
@@ -31,14 +34,15 @@ export class MatchService {
   
     if (resp) {
       await redis.del(`match:${this.searchType}:${userId}`);
-      return { ...JSON.parse(resp), roomId: "roomId" } as MatchPayload;
+      return { ...JSON.parse(resp) } as MatchPayload;
     } else {
       return null;
     }
   }
   
   async setMatch(user1: string, user2: string) {
-    const roomId = uuidv4();
+    const room = await this.chatRoomService.createRoom(user1, user2);
+    const roomId = room.id;
     const token1 = generateToken({
       senderId: user1,
       receiverId: user2,
@@ -53,6 +57,7 @@ export class MatchService {
   
     await this.availableUserService.removeUser(user1);
     await this.availableUserService.removeUser(user2);
+
   
     const pipeline = redis.pipeline();
   
@@ -60,11 +65,13 @@ export class MatchService {
     pipeline.hset(`match:${this.searchType}:${user1}`, 'data', JSON.stringify({
       userId: user2,
       token: token1,
+      roomId,
     }));
   
     pipeline.hset(`match:${this.searchType}:${user2}`, 'data', JSON.stringify({
       userId: user1,
       token: token2,
+      roomId,
     }));
   
     await pipeline.exec();
@@ -74,7 +81,7 @@ export class MatchService {
     const availableUsers = await this.availableUserService.getAvailableUsers();
 
     if (availableUsers.length < 2) {
-      console.log("Not enough users to match");
+      // console.log("Not enough users to match");
       return;
     }
 

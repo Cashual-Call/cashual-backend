@@ -1,5 +1,5 @@
 import { Socket } from "socket.io";
-import { pubClient, redis } from "../../lib/redis";
+import { pubClient, redis, subClient } from "../../lib/redis";
 import { sendMessageSchema, Message } from "../../validation/chat.validation";
 import { ChatEvent } from "../../config/websocket";
 import ChatDBService from "../../service/chat-db.service";
@@ -117,19 +117,24 @@ export class ChatReceiverController {
 
   async chatMessage(data: any) {
     try {
-      const validatedData = sendMessageSchema.parse(data);
-
+      const validatedData = sendMessageSchema.parse({
+        ...data,
+        roomId: this.roomId,
+        senderId: this.senderId,
+      });
       // Check if user has permission to send message
       const isUserInRoom = await redis.sismember(
         `chat:rooms:${this.roomId}`,
         this.socket.id
       );
-
-      if (!isUserInRoom) {
-        this.socket.emit(ChatEvent.ERROR, "You are not in this room");
-        return;
-      }
-
+      
+      
+      // TODO: Remove CMTS
+      // if (!isUserInRoom) {
+      //   this.socket.emit(ChatEvent.ERROR, "You are not in this room");
+      //   return;
+      // }
+      
       // Create the complete message object
       const message: Message = {
         content: validatedData.content,
@@ -154,7 +159,13 @@ export class ChatReceiverController {
       await redis.ltrim(`chat:room:${this.roomId}:messages`, 0, 99); // Keep last 100 messages
 
       // Publish message to Redis
+      console.log("Publishing message:", message);
       await pubClient.publish(RedisHash.CHAT_MESSAGES, JSON.stringify(message));
+
+      console.log({
+        id: messageObj.id,
+        timestamp: messageObj.timestamp,
+      });
 
       // Acknowledge message received
       this.socket.emit(ChatEvent.MESSAGE_SENT, {

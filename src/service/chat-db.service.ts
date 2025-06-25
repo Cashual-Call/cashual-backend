@@ -12,9 +12,10 @@ export default class ChatDBService {
     message: string,
     senderId: string,
     receiverId: string,
-    chatRoomId: string
+    roomId: string
   ) {
-    const chatRoom = await this.chatRoomService.getChatRoom(chatRoomId);
+    // TODO: Add chat room to database
+    const chatRoom = await this.chatRoomService.getRoom(roomId);
 
     if (!chatRoom) {
       throw new Error("Chat room not found");
@@ -25,7 +26,7 @@ export default class ChatDBService {
       content: message,
       senderId,
       receiverId,
-      chatRoomId,
+      roomId,
       timestamp: new Date().toISOString(),
     }
 

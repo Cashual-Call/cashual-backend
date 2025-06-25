@@ -28,9 +28,9 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
 const io = new Server(httpServer, {
   cors: {
-    origin: FRONTEND_URL,
+    origin: [FRONTEND_URL, "https://admin.socket.io"],
     methods: ["GET", "POST"],
-    credentials: true,
+    credentials: false,
   },
 });
 
@@ -78,6 +78,44 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/search", searchRouter);
 app.use("/api/v1/history", historyRouter);
 app.use("/api/v1/upload", uploadRouter);
+
+// Health check endpoint with detailed system metrics
+app.get("/health", (req, res) => {
+  const uptime = process.uptime();
+  const memoryUsage = process.memoryUsage();
+  const cpuUsage = process.cpuUsage();
+
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: {
+      seconds: uptime,
+      formatted: `${Math.floor(uptime / 3600)}h ${Math.floor(
+        (uptime % 3600) / 60
+      )}m ${Math.floor(uptime % 60)}s`,
+    },
+    memory: {
+      total: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
+      used: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
+      external: `${Math.round(memoryUsage.external / 1024 / 1024)}MB`,
+      rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
+    },
+    cpu: {
+      user: `${Math.round(cpuUsage.user / 1000)}ms`,
+      system: `${Math.round(cpuUsage.system / 1000)}ms`,
+    },
+    environment: process.env.NODE_ENV || "development",
+  });
+});
+
+// 404 handler - must be after all routes but before error handler
+app.use((req: express.Request, res: express.Response) => {
+  res.status(404).json({
+    error: "Not Found",
+    message: "The requested resource does not exist",
+    path: req.path,
+  });
+});
 
 app.use(
   (

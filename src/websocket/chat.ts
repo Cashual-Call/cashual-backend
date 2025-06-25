@@ -1,4 +1,4 @@
-import { Server, Socket } from "socket.io";
+import { Server, Socket, Namespace } from "socket.io";
 import { subClient } from "../lib/redis";
 import { ChatReceiverController } from "../controller/chat/chat-reciever.controller";
 import { ChatEvent } from "../config/websocket";
@@ -48,14 +48,14 @@ export function setupChatHandlers(io: Server) {
   // Set up the chat namespace
   const chatNamespace = io.of("/chat");
 
+  const chatEmitterController = new ChatEmitterController(chatNamespace);
+  chatEmitterController.initializeSubscriptions();
+
   chatNamespace.on("connection", async (socket: Socket) => {
     console.log("Chat client connected:", socket.id);
     const authToken = socket.handshake.auth.token;
     const { roomId, senderId, receiverId } = verifyToken(authToken);
 
-    const chatEmitterController = new ChatEmitterController(socket);
-    chatEmitterController.initializeSubscriptions();
-    
     const chatRecieverController = new ChatReceiverController(
       socket,
       roomId,
@@ -63,8 +63,10 @@ export function setupChatHandlers(io: Server) {
       receiverId
     );
 
+    chatRecieverController.joinRoom()
+
     // Join a chat room
-    socket.on(ChatEvent.JOIN, () => chatRecieverController.joinRoom());
+    // socket.on(ChatEvent.JOIN, () => chatRecieverController.joinRoom());
 
     // Leave a chat room
     socket.on(ChatEvent.LEAVE, () => chatRecieverController.leaveRoom());

@@ -26,9 +26,9 @@ export class SearchController {
       throw new Error("User is Not Validated");
     }
 
-    await this.matchService.addUser(userId, []);
+    const result = await this.matchService.addUser(userId, []);
 
-    res.status(200).json({ message: "Search started" });
+    res.status(200).json({ message: "Search started", data: { user: result } });
     return;
   }
 

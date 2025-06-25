@@ -11,7 +11,6 @@ export const messageSchema = z.object({
 });
 
 export const sendMessageSchema = z.object({
-  id: z.string(),
   content: z.string().min(1),
   roomId: z.string(),
   timestamp: z.string().transform((str) => new Date(str)),

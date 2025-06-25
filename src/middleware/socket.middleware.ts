@@ -45,6 +45,13 @@ export const generateToken = (obj: SocketJWTPayload): string => {
 };
 
 export const verifyToken = (token: string) => {
+  if (!token) {
+    return {
+      roomId: "",
+      senderId: "",
+      receiverId: "",
+    };
+  }
   return jwt.verify(token, secret) as SocketJWTPayload;
 };
 

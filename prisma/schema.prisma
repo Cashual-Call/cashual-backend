@@ -8,21 +8,21 @@ generator client {
 }
 
 model User {
-  id          String    @id @default(uuid())
-  username    String    @unique
-  publicKey   String   @unique
-  walletAddress String @unique
-  gender      Gender?
-  ipAddress   String?
-  avatarUrl   String?
-  interests   String[]
-  isPro       Boolean   @default(false)
-  proEnd      DateTime?
-  isBanned    Boolean   @default(false)
-  rating      Float     @default(0)
-  ratingCount Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(uuid())
+  username      String    @unique
+  publicKey     String    @unique
+  walletAddress String    @unique
+  gender        Gender?
+  ipAddress     String?
+  avatarUrl     String?
+  interests     String[]
+  isPro         Boolean   @default(false)
+  proEnd        DateTime?
+  isBanned      Boolean   @default(false)
+  rating        Float     @default(0)
+  ratingCount   Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // Relations
   initiatedCalls     Call[]             @relation("initiator_calls")
@@ -35,8 +35,8 @@ model User {
   reportsReceived    Report[]           @relation("reported_user")
   leaderboardEntries LeaderboardEntry[]
   subscriptions      Subscription[]
-  chatRooms1         ChatRoom[]         @relation("user1_chats")
-  chatRooms2         ChatRoom[]         @relation("user2_chats")
+  rooms1             Room[]             @relation("user1_rooms")
+  rooms2             Room[]             @relation("user2_rooms")
 }
 
 model Call {
@@ -50,22 +50,27 @@ model Call {
   ratedByReceiver  Int?
 
   // Relations
-  initiator User @relation("initiator_calls", fields: [initiatorId], references: [id])
-  receiver  User @relation("receiver_calls", fields: [receiverId], references: [id])
+  initiator User? @relation("initiator_calls", fields: [initiatorId], references: [id])
+  receiver  User? @relation("receiver_calls", fields: [receiverId], references: [id])
 }
 
 model Text {
   id         String   @id @default(uuid())
-  senderId   String
-  receiverId String
+  
+  senderId   String?
+  receiverId String?
+
+  senderAnonId String
+  receiverAnonId String
+
   content    String
   sentAt     DateTime @default(now())
-  chatRoomId String
+  roomId     String
 
   // Relations
-  sender   User @relation("sender_texts", fields: [senderId], references: [id])
-  receiver User @relation("receiver_texts", fields: [receiverId], references: [id])
-  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id])
+  sender   User? @relation("sender_texts", fields: [senderId], references: [id])
+  receiver User? @relation("receiver_texts", fields: [receiverId], references: [id])
+  room     Room  @relation(fields: [roomId], references: [id])
 }
 
 model Friendship {
@@ -117,19 +122,27 @@ model Subscription {
   user User @relation(fields: [userId], references: [id])
 }
 
-model ChatRoom {
-  id        String   @id @default(uuid())
-  userId1   String
-  userId2   String
+model Room {
+  id          String   @id @default(uuid())
+  type        RoomType
+  user1Id     String? // references User
+  anonUser1Id String? // fallback for anonymous user
+  user2Id     String?
+  anonUser2Id String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  user1     User  @relation("user1_chats", fields: [userId1], references: [id])
-  user2     User  @relation("user2_chats", fields: [userId2], references: [id])
-  messages  Text[]
+  messages Text[]
 
-  @@unique([userId1, userId2])
+  // Relations
+  user1 User? @relation("user1_rooms", fields: [user1Id], references: [id])
+  user2 User? @relation("user2_rooms", fields: [user2Id], references: [id])
+
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([anonUser1Id])
+  @@index([anonUser2Id])
 }
 
 enum Plan {
@@ -140,4 +153,10 @@ enum Plan {
 enum Gender {
   MALE
   FEMALE
+}
+
+enum RoomType {
+  CHAT
+  CALL
+  VIDEO_CALL
 }

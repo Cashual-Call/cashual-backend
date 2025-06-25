@@ -48,6 +48,7 @@ export class AvailableUserService {
     }
 
     await pipeline.exec();
+    return userId;
   }
 
   async removeUser(userId: string) {

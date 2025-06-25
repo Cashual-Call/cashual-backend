@@ -3,14 +3,16 @@ import { redis as connection } from '../lib/redis';
 import { MatchService } from '../service/match.service';
 import { matchQueue } from '../lib/queue';
 
-const matchService = new MatchService("chat");
+const matchServiceChat = new MatchService("chat");
+const matchServiceCall = new MatchService("call");
 
 // Create a queue
 // Create a worker to process jobs
 const worker = new Worker(
   'match-queue',
   async (job) => {
-    await matchService.bestMatch();
+    await matchServiceChat.bestMatch();
+    await matchServiceCall.bestMatch();
   },
   { connection }
 );

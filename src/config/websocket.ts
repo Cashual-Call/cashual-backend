@@ -23,3 +23,19 @@ export enum SearchEvent {
   SEARCHING = "searching",
   ERROR = "error",
 }
+
+export enum CallEvent {
+  JOIN_ROOM = "join-room",
+  END_CALL = "end-call",
+  USER_JOINED = "user-joined",
+  USER_LEFT = "user-left",
+  USER_DISCONNECTED = "user-disconnected",
+  USER_CONNECTED = "user-connected",
+  ERROR = "error",
+  RECONNECT = "reconnect",
+  OFFER = "offer",
+  ANSWER = "answer",
+  CANDIDATE = "candidate",
+  DISCONNECT = "disconnect",
+  HEARTBEAT = "heartbeat",
+}

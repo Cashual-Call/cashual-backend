@@ -8,7 +8,7 @@ export function setupWebSocketHandlers(io: Server, redis: Redis) {
   // Initialize all WebSocket handlers
   setupChatHandlers(io);
   // setupSearchHandlers(io, redis);
-  setupCallHandlers(io, redis);
+  setupCallHandlers(io);
 
   // Global error handling
   io.on('error', (error) => {
