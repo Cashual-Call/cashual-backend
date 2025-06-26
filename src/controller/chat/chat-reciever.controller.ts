@@ -159,7 +159,7 @@ export class ChatReceiverController {
       await redis.ltrim(`chat:room:${this.roomId}:messages`, 0, 99); // Keep last 100 messages
 
       // Publish message to Redis
-      console.log("Publishing message:", message);
+      // console.log("Publishing message:", message);
       await pubClient.publish(RedisHash.CHAT_MESSAGES, JSON.stringify(message));
 
       console.log({
