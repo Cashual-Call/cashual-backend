@@ -9,6 +9,7 @@ import morgan from "morgan";
 import bodyParser from "body-parser";
 import session from "express-session";
 import "dotenv/config";
+import "./lib/redis";
 import authRouter from "./routes/auth.route";
 import { setupWebSocketHandlers } from "./websocket";
 import { pubClient, subClient } from "./lib/redis";
@@ -18,8 +19,13 @@ import userRouter from "./routes/user.route";
 import historyRouter from "./routes/history.route";
 import socketAuthMiddleware from "./middleware/socket.middleware";
 import uploadRouter from "./routes/upload.route";
-import { addRecurringJob } from "./cron/match.cron";
+import { addRecurringJob, cleanup as matchCleanup } from "./cron/match.cron";
 import searchRouter from "./routes/search.route";
+import path from "path";
+import { ExpressAdapter } from "@bull-board/express";
+import { createBullBoard } from "@bull-board/api";
+import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
+import { messageQueue, matchQueue } from "./lib/queue";
 
 const app = express();
 const httpServer = createServer(app);
@@ -36,17 +42,14 @@ const io = new Server(httpServer, {
 
 instrument(io, {
   auth: false,
-  mode: "development",
+  mode: (process.env.NODE_ENV as "development" | "production") || "development",
 });
-
-// Start the recurring job
-addRecurringJob().catch(console.error);
 
 // Set up Redis adapter for Socket.IO
 Promise.all([pubClient, subClient]).then(([pub, sub]) => {
   io.adapter(createAdapter(pub, sub));
   // Initialize WebSocket handlers after Redis adapter is set up
-  setupWebSocketHandlers(io, pub);
+  setupWebSocketHandlers(io);
 });
 
 // Middleware
@@ -78,6 +81,15 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/search", searchRouter);
 app.use("/api/v1/history", historyRouter);
 app.use("/api/v1/upload", uploadRouter);
+
+// Bull Board setup
+const serverAdapter = new ExpressAdapter();
+serverAdapter.setBasePath("/admin/queues");
+createBullBoard({
+  queues: [new BullMQAdapter(messageQueue), new BullMQAdapter(matchQueue)],
+  serverAdapter,
+});
+app.use("/admin/queues", serverAdapter.getRouter());
 
 // Health check endpoint with detailed system metrics
 app.get("/health", (req, res) => {
@@ -131,6 +143,13 @@ app.use(
 
 const PORT = process.env.PORT || 8080;
 
+// Start the recurring job
+addRecurringJob()
+  .then(() => {
+    console.log("Recurring job Started...");
+  })
+  .catch(console.error);
+
 httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
@@ -141,6 +160,8 @@ process.on("SIGTERM", async () => {
   await prisma.$disconnect();
   await pubClient.quit();
   await subClient.quit();
+  await matchCleanup();
+
   httpServer.close(() => {
     console.log("HTTP server closed");
     process.exit(0);

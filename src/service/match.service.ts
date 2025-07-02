@@ -79,9 +79,9 @@ export class MatchService {
 
   async bestMatch() {
     const availableUsers = await this.availableUserService.getAvailableUsers();
+    console.log(`${this.searchType} availableUsers`, availableUsers);
 
     if (availableUsers.length < 2) {
-      // console.log("Not enough users to match");
       return;
     }
 

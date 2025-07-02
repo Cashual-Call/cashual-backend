@@ -2,18 +2,20 @@ import { Queue, Worker, QueueEvents } from "bullmq";
 import { prisma } from "./prisma";
 import { redis as connection } from "./redis";
 
-// Create message queue
-export const messageQueue = new Queue("chat-messages", { connection });
+// Shared configuration to ensure all keys hash to the same slot
+const sharedQueueConfig = {
+  connection,
+  prefix: "{cashual}",
+};
 
-export const availableUserQueue = new Queue("available-users", { connection });
+// Create Queues
+export const messageQueue = new Queue("chat-messages", sharedQueueConfig);
+export const matchQueue = new Queue("match-queue", sharedQueueConfig);
 
-export const matchQueue = new Queue("match-queue", { connection });
+// Create Queue Events
+const messageQueueEvents = new QueueEvents("chat-messages", sharedQueueConfig);
 
-// Create queue events
-const messageQueueEvents = new QueueEvents("chat-messages", { connection });
-
-// TODO: HANDLE CODE IN DIFFERENT FILES
-// Process messages
+// Create Worker for chat messages
 const messageWorker = new Worker(
   "chat-messages",
   async (job) => {
@@ -23,9 +25,6 @@ const messageWorker = new Worker(
       const message = await prisma.text.create({
         data: {
           content,
-          // TODO: Handle this
-          // senderId,
-          // receiverId,
           roomId,
           senderAnonId: senderId,
           receiverAnonId: receiverId,
@@ -38,7 +37,7 @@ const messageWorker = new Worker(
       throw error;
     }
   },
-  { connection }
+  sharedQueueConfig
 );
 
 // Handle failed jobs

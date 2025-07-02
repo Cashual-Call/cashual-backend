@@ -4,7 +4,7 @@ import { setupChatHandlers } from './chat';
 // import { setupSearchHandlers } from './search';
 import { setupCallHandlers } from './call';
 
-export function setupWebSocketHandlers(io: Server, redis: Redis) {
+export function setupWebSocketHandlers(io: Server) {
   // Initialize all WebSocket handlers
   setupChatHandlers(io);
   // setupSearchHandlers(io, redis);
