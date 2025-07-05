@@ -57,6 +57,7 @@ export class SearchController {
     if (!match) {
       return res.status(404).json({ message: "No match found" });
     }
+
     res.status(200).json({ data: match, message: "Match found" });
     return;
   }

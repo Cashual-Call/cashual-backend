@@ -29,6 +29,47 @@ export default class RoomService {
     return `${this.LAST_MESSAGE_KEY_PREFIX}${roomId}`;
   }
 
+  async getRoomByUserId(userId: string) {
+    // Try to get from cache first
+    const cachedUserRooms = await redis.get(this.getUserRoomsKey(userId));
+  
+    if (cachedUserRooms) {
+      const room = JSON.parse(cachedUserRooms);
+      if(Array.isArray(room) && room.length > 0) {
+        return room[0];
+      } else {
+        return room;
+      }
+    }
+  
+    // If not in cache, fetch from database
+    const room = await prisma.room.findFirst({
+      where: {
+        OR: [
+          { user1Id: userId },
+          { user2Id: userId },
+          { anonUser1Id: userId },
+          { anonUser2Id: userId },
+        ],
+        type: this.roomType,
+      },
+      orderBy: {
+        updatedAt: "desc", // Most recently updated rooms first
+      },
+    });
+
+    // Cache the result
+    await redis.set(
+      this.getUserRoomsKey(userId),
+      JSON.stringify(room),
+      "EX",
+      this.CACHE_TTL
+    );
+  
+    return room;
+  }
+  
+  // Updated createRoom method with better caching performance
   async createRoom(
     user1Id: string,
     user2Id: string,
@@ -45,24 +86,47 @@ export default class RoomService {
           type: this.roomType as RoomType,
         },
       });
-
-      // Cache the new chat room
+  
+      // Cache the new room
       await redis.set(
         this.getRoomKey(room.id),
         JSON.stringify(room),
         "EX",
         this.CACHE_TTL
       );
-
-      // Invalidate user chat rooms cache for both users
-      await redis.del(this.getUserRoomsKey(user1Id));
-      await redis.del(this.getUserRoomsKey(user2Id));
-
+  
+      // Update user rooms cache by adding the new room to existing cached lists
+      await this.updateUserRoomsCache(user1Id, room);
+      await this.updateUserRoomsCache(user2Id, room);
+  
       return room;
     } catch (error) {
       console.error("Error creating chat room:", error);
       throw error;
     }
+  }
+  
+  // Helper method to update user rooms cache efficiently
+  private async updateUserRoomsCache(userId: string, newRoom: any) {
+    const cachedUserRooms = await redis.get(this.getUserRoomsKey(userId));
+    
+    if (cachedUserRooms) {
+      // If cache exists, add the new room to the beginning of the list
+      let rooms = JSON.parse(cachedUserRooms);
+      if(Array.isArray(rooms) && rooms.length > 0) {
+        rooms.unshift(newRoom); // Add to beginning since it's the newest
+      } else {
+        rooms = [newRoom];
+      }
+      
+      await redis.set(
+        this.getUserRoomsKey(userId),
+        JSON.stringify(rooms),
+        "EX",
+        this.CACHE_TTL
+      );
+    }
+    // If cache doesn't exist, don't create it here - let getRoomByUserId handle it
   }
 
   async getRoom(id: string) {
@@ -93,33 +157,7 @@ export default class RoomService {
     return room;
   }
 
-  async getroomByUserId(userId: string) {
-    // Try to get from cache first
-    const cachedrooms = await redis.get(this.getUserRoomsKey(userId));
-
-    if (cachedrooms) {
-      return JSON.parse(cachedrooms);
-    }
-
-    // If not in cache, fetch from database
-    const rooms = await prisma.room.findMany({
-      where: {
-        OR: [{ user1Id: userId }, { user2Id: userId }],
-      },
-    });
-
-    // Cache the result
-    await redis.set(
-      this.getUserRoomsKey(userId),
-      JSON.stringify(rooms),
-      "EX",
-      this.CACHE_TTL
-    );
-
-    return rooms;
-  }
-
-  async getroomByUsers(user1Id: string, user2Id: string) {
+  async getRoomByUsers(user1Id: string, user2Id: string) {
     // For this method, we'll query the database directly as it's a specific lookup
     // that would be inefficient to cache separately
     const room = await prisma.room.findFirst({

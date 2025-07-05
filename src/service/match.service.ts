@@ -1,8 +1,8 @@
 import { AvailableUserService } from "./available-user.service";
 import { redis } from "../lib/redis";
 import { generateToken } from "../middleware/socket.middleware";
-import { v4 as uuidv4 } from "uuid";
 import ChatRoomService from "./chat-room.service";
+
 interface MatchPayload {
   userId: string;
   roomId: string;
@@ -30,11 +30,11 @@ export class MatchService {
   }
 
   async getMatchedJWT(userId: string) {
-    const resp = await redis.hget(`match:${this.searchType}:${userId}`, 'data');
-  
+    const resp = await this.chatRoomService.getRoomByUserId(userId);
+
     if (resp) {
-      await redis.del(`match:${this.searchType}:${userId}`);
-      return { ...JSON.parse(resp) } as MatchPayload;
+      // await redis.del(`match:${this.searchType}:${userId}`);
+      return { ...resp } as MatchPayload;
     } else {
       return null;
     }
