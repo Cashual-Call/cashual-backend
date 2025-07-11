@@ -37,6 +37,7 @@ model User {
   subscriptions      Subscription[]
   rooms1             Room[]             @relation("user1_rooms")
   rooms2             Room[]             @relation("user2_rooms")
+  UserPoints         UserPoints[]
 }
 
 model Call {
@@ -55,17 +56,17 @@ model Call {
 }
 
 model Text {
-  id         String   @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   senderId   String?
   receiverId String?
 
-  senderAnonId String
+  senderAnonId   String
   receiverAnonId String
 
-  content    String
-  sentAt     DateTime @default(now())
-  roomId     String
+  content String
+  sentAt  DateTime @default(now())
+  roomId  String
 
   // Relations
   sender   User? @relation("sender_texts", fields: [senderId], references: [id])
@@ -143,6 +144,17 @@ model Room {
   @@index([user2Id])
   @@index([anonUser1Id])
   @@index([anonUser2Id])
+}
+
+// Add of the user points are stored in the database by date
+model UserPoints {
+  id        String   @id @default(uuid())
+  userId    String
+  points    Int
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
 }
 
 enum Plan {

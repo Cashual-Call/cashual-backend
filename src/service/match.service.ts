@@ -1,7 +1,8 @@
 import { AvailableUserService } from "./available-user.service";
 import { redis } from "../lib/redis";
 import { generateToken } from "../middleware/socket.middleware";
-import ChatRoomService from "./chat-room.service";
+import RoomService from "./room.service";
+import { RoomType } from "@prisma/client";
 
 interface MatchPayload {
   userId: string;
@@ -12,12 +13,14 @@ interface MatchPayload {
 export class MatchService {
   private searchType: string;
   private availableUserService: AvailableUserService;
-  private chatRoomService: ChatRoomService;
+  private roomService: RoomService;
 
   constructor(searchType: string) {
     this.searchType = searchType;
     this.availableUserService = new AvailableUserService(searchType);
-    this.chatRoomService = new ChatRoomService();
+    this.roomService = new RoomService(
+      searchType === "chat" ? RoomType.CHAT : RoomType.CALL
+    );
   }
 
   async addUser(userId: string, interests: string[]) {
@@ -30,18 +33,19 @@ export class MatchService {
   }
 
   async getMatchedJWT(userId: string) {
-    const resp = await this.chatRoomService.getRoomByUserId(userId);
+    const resp = await redis.hget(`match:${this.searchType}:${userId}`, 'data');
 
     if (resp) {
+      const payload = JSON.parse(resp) as MatchPayload;
       // await redis.del(`match:${this.searchType}:${userId}`);
-      return { ...resp } as MatchPayload;
+      return payload;
     } else {
       return null;
     }
   }
   
   async setMatch(user1: string, user2: string) {
-    const room = await this.chatRoomService.createRoom(user1, user2);
+    const room = await this.roomService.createRoom(user1, user2);
     const roomId = room.id;
     const token1 = generateToken({
       senderId: user1,

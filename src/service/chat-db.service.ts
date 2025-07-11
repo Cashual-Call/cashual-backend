@@ -1,4 +1,4 @@
-import ChatRoomService from "./chat-room.service";
+import ChatRoomService from "./room.service";
 import { messageQueue } from "../lib/queue";
 import { v4 as uuidv4 } from "uuid";
 export default class ChatDBService {

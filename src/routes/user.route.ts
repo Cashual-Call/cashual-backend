@@ -1,5 +1,6 @@
 import { Router, RequestHandler } from "express";
 import { UserController } from "../controller/user.controller";
+import { validateResponse } from "../middleware/validate.middleware";
 
 const userController = new UserController();
 
@@ -12,6 +13,10 @@ router.get(
 );
 router.get("/user-id", userController.getUserId as RequestHandler);
 router.post("/user-id", userController.verifyUserId as RequestHandler);
+
+router.get("/points", userController.getPoints as RequestHandler);
+router.get("/points-by-date", userController.getUserPointsByDate as RequestHandler);
+router.get("/rankings", validateResponse, userController.getRankings as RequestHandler);
 
 // Create a new user
 // router.post("/", createUser as RequestHandler);

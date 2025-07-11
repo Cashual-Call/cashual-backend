@@ -15,6 +15,8 @@ export class UserController {
     this.getAllUsers = this.getAllUsers.bind(this);
     this.updateUser = this.updateUser.bind(this);
     this.deleteUser = this.deleteUser.bind(this);
+    this.getPoints = this.getPoints.bind(this);
+    this.getUserPointsByDate = this.getUserPointsByDate.bind(this);
   }
 
   createUser = async (req: Request, res: Response) => {
@@ -234,4 +236,22 @@ export class UserController {
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
     res.json({ isValid, ipAddress });
   }
+
+  getPoints = async (req: Request, res: Response) => {
+    const publicKey = req.user?.publicKey || "";
+    const { startDate, endDate } = req.query;
+    const points = await this.userService.getPoints(publicKey, new Date(startDate as string), new Date(endDate as string));
+    res.json({ points });
+  }
+
+  getUserPointsByDate = async (req: Request, res: Response) => {
+    const publicKey = req.user?.publicKey || "";
+    const points = await this.userService.getUserPointsByDate(publicKey);
+    res.json({ points });
+  }
+
+  getRankings = async (_: Request, res: Response) => {
+    const data = await this.userService.getRankings();
+    res.json({ data });
+  } 
 }

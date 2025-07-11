@@ -1,10 +1,14 @@
 import { Prisma, User } from "@prisma/client";
 import { prisma } from "../lib/prisma";
+import { PointService } from "./point.service";
 
 type Gender = "MALE" | "FEMALE";
 
 export class UserService {
+  private pointService: PointService;
   constructor() {
+    this.pointService = new PointService();
+
     this.createUser = this.createUser.bind(this);
     this.getUserById = this.getUserById.bind(this);
     this.getAllUsers = this.getAllUsers.bind(this);
@@ -27,7 +31,7 @@ export class UserService {
       return await prisma.user.create({
         data: {
           ...userData,
-          publicKey: userData.publicKey || '',
+          publicKey: userData.publicKey || "",
         },
       });
     } catch (error) {
@@ -81,14 +85,17 @@ export class UserService {
     }
   }
 
-  async updateUser(id: string, userData: {
-    username?: string;
-    publicKey?: string;
-    gender?: Gender;
-    avatarUrl?: string;
-    isPro?: boolean;
-    proEnd?: Date;
-  }): Promise<User> {
+  async updateUser(
+    id: string,
+    userData: {
+      username?: string;
+      publicKey?: string;
+      gender?: Gender;
+      avatarUrl?: string;
+      isPro?: boolean;
+      proEnd?: Date;
+    }
+  ): Promise<User> {
     try {
       return await prisma.user.update({
         where: { id },
@@ -189,5 +196,68 @@ export class UserService {
         fallback: "A3",
       },
     ];
+  }
+
+  async getPoints(
+    userId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<number> {
+    try {
+      const result = await prisma.userPoints.aggregate({
+        where: {
+          userId,
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        _sum: {
+          points: true,
+        },
+      });
+      return result._sum.points || 0;
+    } catch (error) {
+      throw new Error("Failed to get points");
+    }
+  }
+
+  async getUserPointsByDate(
+    userId: string
+  ): Promise<{ date: Date; point: number }[]> {
+    try {
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+      const results = await prisma.userPoints.groupBy({
+        by: ["createdAt"],
+        where: {
+          userId,
+          createdAt: {
+            gte: oneYearAgo,
+            lte: new Date(),
+          },
+        },
+        _sum: {
+          points: true,
+        },
+      });
+
+      return results.map((result) => ({
+        date: result.createdAt,
+        point: result._sum.points || 0,
+      }));
+    } catch (error) {
+      throw new Error("Failed to get user points by date");
+    }
+  }
+
+  async getRankings() {
+    const today = new Date();
+    try {
+      return await this.pointService.getAllUserPointsByDate(today);
+    } catch (error) {
+      throw new Error("Failed to get rankings");
+    }
   }
 }
