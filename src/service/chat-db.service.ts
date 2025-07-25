@@ -1,11 +1,17 @@
 import ChatRoomService from "./room.service";
 import { messageQueue } from "../lib/queue";
 import { v4 as uuidv4 } from "uuid";
+import { redis } from "../lib/redis";
+
+const GLOBAL_MESSAGE_KEY = `global:message`;
+
 export default class ChatDBService {
   private chatRoomService: ChatRoomService;
 
   constructor() {
     this.chatRoomService = new ChatRoomService();
+    this.addMessage = this.addMessage.bind(this);
+    this.getMessages = this.getMessages.bind(this);
   }
 
   async addMessage(
@@ -67,4 +73,24 @@ export default class ChatDBService {
 
     return allMessages;
   }  
+
+  async addGlobalMessage(message: string, senderId: string) {
+    const messageObj = {
+      id: uuidv4(),
+      content: message,
+      senderId,
+      timestamp: new Date().toISOString(),
+    }
+    await redis.multi()
+      .lpush(GLOBAL_MESSAGE_KEY, JSON.stringify(messageObj))
+      .ltrim(GLOBAL_MESSAGE_KEY, 0, 99)
+      .exec();
+
+    return messageObj;
+  }
+
+  async getGlobalMessages() {
+    const messages = await redis.lrange(GLOBAL_MESSAGE_KEY, 0, 99);
+    return messages.map(message => JSON.parse(message));
+  }
 }

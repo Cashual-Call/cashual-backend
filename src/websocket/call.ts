@@ -3,8 +3,9 @@ import { redis } from "../lib/redis";
 import { prisma } from "../lib/prisma";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { CallEvent } from "../config/websocket";
+import { verifyToken } from "../middleware/socket.middleware";
 
-// TODO: Add a limit to the number of participants in a call
+// TODO: Implement user points tracking and related endpoints in user service
 const MAX_PARTICIPANTS = 10e6;
 const RATE_LIMIT = {
   points: 10,
@@ -32,11 +33,13 @@ function validateRoomId(roomId: string): boolean {
 export function setupCallHandlers(io: Server) {
   io.of("/call").on("connection", (socket: Socket) => {
     console.log("[Call] Client connected:", socket.id);
+    const authToken = socket.handshake.auth.token;
+    const {roomId, senderId, receiverId} = verifyToken(authToken);
     
     io.engine.emit(CallEvent.JOIN_ROOM, socket.id);
 
     // Join a call room
-    socket.on(CallEvent.JOIN_ROOM, async (roomId: string) => {
+    socket.on(CallEvent.JOIN_ROOM, async () => {
       try {
         console.log("[Call] Attempting to join room:", roomId);
         // Rate limiting
@@ -100,31 +103,31 @@ export function setupCallHandlers(io: Server) {
     });
 
     // Handle WebRTC offer
-    socket.on(CallEvent.OFFER, (data: { roomId: string; offer: any }) => {
-      console.log("[Call] Received offer:", { roomId: data.roomId });
-      socket.to(data.roomId).emit("offer", {
+    socket.on(CallEvent.OFFER, (data: { offer: any }) => {
+      console.log("[Call] Received offer:", { roomId });
+      socket.to(roomId).emit("offer", {
         offer: data.offer,
       });
     });
 
     // Handle WebRTC answer
-    socket.on(CallEvent.ANSWER, (data: { roomId: string; answer: any }) => {
-      console.log("[Call] Received answer:", { roomId: data.roomId });
-      socket.to(data.roomId).emit("answer", {
+    socket.on(CallEvent.ANSWER, (data: { answer: any }) => {
+      console.log("[Call] Received answer:", { roomId });
+      socket.to(roomId).emit("answer", {
         answer: data.answer,
       });
     });
 
     // Handle ICE candidates
-    socket.on(CallEvent.CANDIDATE, (data: { roomId: string; candidate: any }) => {
-      console.log("[Call] Received ICE candidate:", { roomId: data.roomId });
-      socket.to(data.roomId).emit("candidate", {
+    socket.on(CallEvent.CANDIDATE, (data: { candidate: any }) => {
+      console.log("[Call] Received ICE candidate:", { roomId });
+      socket.to(roomId).emit("candidate", {
         candidate: data.candidate,
       });
     });
 
     // Handle call end
-    socket.on(CallEvent.END_CALL, async (roomId: string) => {
+    socket.on(CallEvent.END_CALL, async () => {
       try {
         console.log("[Call] Ending call:", roomId);
         const roomKey = `call:${roomId}`;
@@ -205,12 +208,12 @@ export function setupCallHandlers(io: Server) {
     });
 
     // Handle WebRTC signaling
-    socket.on("signal", (data: { signal: any; to: string; from: string; room: string }) => {
+    socket.on("signal", (data: { signal: any; to: string; from: string;}) => {
       try {
         console.log("[Call] Received signal:", {
           from: data.from,
           to: data.to,
-          room: data.room,
+          room: roomId,
           signalType: data.signal?.type,
           timestamp: new Date().toISOString()
         });
@@ -219,20 +222,20 @@ export function setupCallHandlers(io: Server) {
         socket.to(data.to).emit("signal", {
           signal: data.signal,
           from: data.from,
-          room: data.room
+          room: roomId
         });
         
         console.log("[Call] Forwarded signal to peer:", {
           to: data.to,
           from: data.from,
-          room: data.room
+          room: roomId
         });
       } catch (error) {
         console.error("[Call] Error handling signal:", {
           error,
           from: data.from,
           to: data.to,
-          room: data.room
+          room: roomId
         });
       }
     });
@@ -265,15 +268,15 @@ export function setupCallHandlers(io: Server) {
       try {
         console.log("[Call] User joined event:", {
           userId: data.userId,
-          roomId: data.room.id,
-          participants: data.room.participants,
+          roomId,
+          participants: [...data.room.participants],
           timestamp: new Date().toISOString()
         });
       } catch (error) {
         console.error("[Call] Error handling user-joined event:", {
           error,
           userId: data.userId,
-          room: data.room
+          room: roomId
         });
       }
     });

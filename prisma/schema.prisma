@@ -19,8 +19,6 @@ model User {
   isPro         Boolean   @default(false)
   proEnd        DateTime?
   isBanned      Boolean   @default(false)
-  rating        Float     @default(0)
-  ratingCount   Int       @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -37,7 +35,21 @@ model User {
   subscriptions      Subscription[]
   rooms1             Room[]             @relation("user1_rooms")
   rooms2             Room[]             @relation("user2_rooms")
-  UserPoints         UserPoints[]
+  pointActivity      PointActivity[]
+  ratings            Rating[]           @relation("user_ratings")
+  ratedRatings       Rating[]           @relation("rated_user_ratings")
+}
+
+model Rating {
+  id          String   @id @default(uuid())
+  userId      String
+  ratedUserId String
+  rating      Int
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user      User @relation("user_ratings", fields: [userId], references: [id])
+  ratedUser User @relation("rated_user_ratings", fields: [ratedUserId], references: [id])
 }
 
 model Call {
@@ -146,15 +158,12 @@ model Room {
   @@index([anonUser2Id])
 }
 
-// Add of the user points are stored in the database by date
-model UserPoints {
+model PointActivity {
   id        String   @id @default(uuid())
   userId    String
-  points    Int
+  point     Int
   createdAt DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id])
+  User      User     @relation(fields: [userId], references: [id])
 }
 
 enum Plan {

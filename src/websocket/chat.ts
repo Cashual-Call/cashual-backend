@@ -54,6 +54,11 @@ export function setupChatHandlers(io: Server) {
   chatNamespace.on("connection", async (socket: Socket) => {
     console.log("Chat client connected:", socket.id);
     const authToken = socket.handshake.auth.token;
+    
+    if (!authToken) {
+      console.log("No auth token provided");
+      return;
+    }
     const { roomId, senderId, receiverId } = verifyToken(authToken);
 
     const chatRecieverController = new ChatReceiverController(

@@ -203,53 +203,13 @@ export class UserService {
     startDate: Date,
     endDate: Date
   ): Promise<number> {
-    try {
-      const result = await prisma.userPoints.aggregate({
-        where: {
-          userId,
-          createdAt: {
-            gte: startDate,
-            lte: endDate,
-          },
-        },
-        _sum: {
-          points: true,
-        },
-      });
-      return result._sum.points || 0;
-    } catch (error) {
-      throw new Error("Failed to get points");
-    }
+    return this.pointService.getPoints(userId, startDate, endDate);
   }
 
   async getUserPointsByDate(
     userId: string
   ): Promise<{ date: Date; point: number }[]> {
-    try {
-      const oneYearAgo = new Date();
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-      const results = await prisma.userPoints.groupBy({
-        by: ["createdAt"],
-        where: {
-          userId,
-          createdAt: {
-            gte: oneYearAgo,
-            lte: new Date(),
-          },
-        },
-        _sum: {
-          points: true,
-        },
-      });
-
-      return results.map((result) => ({
-        date: result.createdAt,
-        point: result._sum.points || 0,
-      }));
-    } catch (error) {
-      throw new Error("Failed to get user points by date");
-    }
+    return this.pointService.getUserPointsByDate(userId);
   }
 
   async getRankings() {

@@ -63,6 +63,7 @@
     "tweetnacl": "^1.0.3",
     "typescript": "^5.7.3",
     "uuid": "^11.1.0",
+    "web-push": "^3.6.7",
     "winston": "^3.17.0",
     "winston-cloudwatch": "^6.3.0",
     "zod": "^3.24.1",

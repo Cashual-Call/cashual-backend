@@ -40,19 +40,26 @@ const socketAuthMiddleware = (socket: Socket, next: any) => {
 };
 
 export const generateToken = (obj: SocketJWTPayload): string => {
-  const options: SignOptions = { expiresIn: "1h" };
+  const options: SignOptions = { expiresIn: "7d" };
   return jwt.sign(obj, config.jwt.secret, options);
 };
 
 export const verifyToken = (token: string) => {
-  if (!token) {
+  try {
+    if (!token) {
+      throw new Error("No token provided");
+    }
+    return jwt.verify(token, secret) as SocketJWTPayload;
+  } catch (error) {
+    console.error(error);
+    // console.error("JWT verification failed:", error);
+
     return {
       roomId: "",
       senderId: "",
       receiverId: "",
     };
   }
-  return jwt.verify(token, secret) as SocketJWTPayload;
 };
 
 export default socketAuthMiddleware;

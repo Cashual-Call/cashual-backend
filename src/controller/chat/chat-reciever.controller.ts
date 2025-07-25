@@ -146,7 +146,6 @@ export class ChatReceiverController {
         timestamp: new Date().toISOString(),
       };
 
-      // Store message in Redis for history (with TTL)
       const messageObj = await this.chatDBService.addMessage(
         message.content,
         message.senderId,
@@ -161,11 +160,6 @@ export class ChatReceiverController {
       // Publish message to Redis
       // console.log("Publishing message:", message);
       await pubClient.publish(RedisHash.CHAT_MESSAGES, JSON.stringify(message));
-
-      console.log({
-        id: messageObj.id,
-        timestamp: messageObj.timestamp,
-      });
 
       // Acknowledge message received
       this.socket.emit(ChatEvent.MESSAGE_SENT, {
