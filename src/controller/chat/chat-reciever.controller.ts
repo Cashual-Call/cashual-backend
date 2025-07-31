@@ -123,18 +123,17 @@ export class ChatReceiverController {
         senderId: this.senderId,
       });
       // Check if user has permission to send message
-      const isUserInRoom = await redis.sismember(
-        `chat:rooms:${this.roomId}`,
-        this.socket.id
-      );
-      
-      
+      // const isUserInRoom = await redis.sismember(
+      //   `chat:rooms:${this.roomId}`,
+      //   this.socket.id
+      // );
+
       // TODO: Remove CMTS
       // if (!isUserInRoom) {
       //   this.socket.emit(ChatEvent.ERROR, "You are not in this room");
       //   return;
       // }
-      
+
       // Create the complete message object
       const message: Message = {
         content: validatedData.content,
@@ -146,12 +145,18 @@ export class ChatReceiverController {
         timestamp: new Date().toISOString(),
       };
 
-      const messageObj = await this.chatDBService.addMessage(
-        message.content,
-        message.senderId,
-        message.receiverId,
-        message.roomId
-      );
+      const messageObj =
+        this.roomId !== "general"
+          ? await this.chatDBService.addMessage(
+              message.content,
+              message.senderId,
+              message.receiverId,
+              message.roomId
+            )
+          : await this.chatDBService.addGlobalMessage(
+              message.content,
+              message.senderId
+            );
 
       // Add message ID to room history
       await redis.lpush(`chat:room:${this.roomId}:messages`, messageObj.id);

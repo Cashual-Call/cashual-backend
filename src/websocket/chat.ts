@@ -17,9 +17,14 @@ export function setupChatHandlers(io: Server) {
           console.error(`Failed to subscribe to ${channel}:`, err);
           if (retryCount < 3) {
             // Retry subscription after delay with exponential backoff
-            setTimeout(() => subscribeWithRetry(channel, retryCount + 1), Math.pow(2, retryCount) * 1000);
+            setTimeout(
+              () => subscribeWithRetry(channel, retryCount + 1),
+              Math.pow(2, retryCount) * 1000
+            );
           } else {
-            console.error(`Failed to subscribe to ${channel} after ${retryCount} retries`);
+            console.error(
+              `Failed to subscribe to ${channel} after ${retryCount} retries`
+            );
           }
           return;
         }
@@ -35,7 +40,9 @@ export function setupChatHandlers(io: Server) {
   setupSubscriptions();
 
   subClient.on("reconnect", () => {
-    console.log("Redis subscription client reconnected, setting up subscriptions again");
+    console.log(
+      "Redis subscription client reconnected, setting up subscriptions again"
+    );
     setupSubscriptions();
   });
 
@@ -52,14 +59,15 @@ export function setupChatHandlers(io: Server) {
   chatEmitterController.initializeSubscriptions();
 
   chatNamespace.on("connection", async (socket: Socket) => {
-    console.log("Chat client connected:", socket.id);
     const authToken = socket.handshake.auth.token;
-    
-    if (!authToken) {
-      console.log("No auth token provided");
-      return;
-    }
-    const { roomId, senderId, receiverId } = verifyToken(authToken);
+
+    const { roomId, senderId, receiverId } = authToken
+      ? verifyToken(authToken)
+      : {
+          roomId: "general",
+          senderId: socket.id, // TODO: chanage,
+          receiverId: "global",
+        };
 
     const chatRecieverController = new ChatReceiverController(
       socket,
@@ -68,7 +76,7 @@ export function setupChatHandlers(io: Server) {
       receiverId
     );
 
-    chatRecieverController.joinRoom()
+    chatRecieverController.joinRoom();
 
     // Join a chat room
     // socket.on(ChatEvent.JOIN, () => chatRecieverController.joinRoom());

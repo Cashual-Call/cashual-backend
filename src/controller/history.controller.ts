@@ -11,6 +11,7 @@ export class HistoryController {
     this.getChatHistory = this.getChatHistory.bind(this);
     this.getCallHistory = this.getCallHistory.bind(this);
     this.getRooms = this.getRooms.bind(this);
+    this.getGlobalChats = this.getGlobalChats.bind(this);
   }
 
   async getRooms(req: Request, res: Response) {
@@ -71,5 +72,10 @@ export class HistoryController {
       console.error("Error fetching call history:", error);
       res.status(500).json({ error: "Internal server error" });
     }
+  }
+
+  async getGlobalChats(req: Request, res: Response) {
+    const data = await this.chatDBService.getGlobalMessages();
+    res.json({ data });
   }
 }

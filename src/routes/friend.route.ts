@@ -1,12 +1,14 @@
 import { Router, RequestHandler } from "express";
 import { validateResponse } from "../middleware/validate.middleware";
 import { FriendsController } from "../controller/friend.controller";
+import { verifyToken } from "../middleware/auth.middleware";
 
 const router = Router();
 
 const friendsController = new FriendsController();
 
 router.use(validateResponse);
+router.use(verifyToken);
 
 router.get("/", friendsController.getFriendsList as RequestHandler);
 

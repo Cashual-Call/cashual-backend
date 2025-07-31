@@ -12,6 +12,8 @@ export default class ChatDBService {
     this.chatRoomService = new ChatRoomService();
     this.addMessage = this.addMessage.bind(this);
     this.getMessages = this.getMessages.bind(this);
+    this.addGlobalMessage = this.addGlobalMessage.bind(this);
+    this.getGlobalMessages = this.getGlobalMessages.bind(this);
   }
 
   async addMessage(

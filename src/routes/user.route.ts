@@ -19,7 +19,7 @@ router.get("/points", userController.getPoints as RequestHandler);
 router.get("/points-by-date", userController.getUserPointsByDate as RequestHandler);
 router.get("/rankings", validateResponse, userController.getRankings as RequestHandler);
 
-router.use("/friend", friendRouter);
+router.use("/friends", friendRouter);
 
 // Create a new user
 // router.post("/", createUser as RequestHandler);

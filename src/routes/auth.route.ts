@@ -80,6 +80,7 @@ router.post("/verify", (async (req: Request, res: Response) => {
               avatarUrl: existingUser.avatarUrl,
               gender: existingUser.gender,
               walletAddress: existingUser.walletAddress,
+              isPro: existingUser.isPro,
             }
           : null,
       })
@@ -95,7 +96,6 @@ router.post("/verify", (async (req: Request, res: Response) => {
 // get the session - now protected with JWT
 router.get("/session", verifyToken, (req: Request, res: Response): void => {
   res.setHeader("Content-Type", "application/json");
-  console.log(req.user);
   res.json({ ...req.user });
 });
 

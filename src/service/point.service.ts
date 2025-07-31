@@ -10,6 +10,8 @@ interface UserPointsResponse {
   userId: string;
   points: number;
   activities?: PointActivity[];
+  activityCount?: number;
+  avatar?: string;
 }
 
 interface PointActivity {
@@ -291,7 +293,29 @@ export class PointService {
   /**
    * Get all users' points for a specific date
    */
-  async getAllUserPointsByDate(date: Date): Promise<UserPointsResponse[]> {
+  async getAllUserPointsByDate(date: Date, mock: boolean = true): Promise<UserPointsResponse[]> {
+    if (mock) {
+      return [
+        {
+          userId: "mockUser1",
+          points: 120,
+          activityCount: 3,
+          avatar: "https://via.placeholder.com/150",
+        },
+        {
+          userId: "mockUser2",
+          points: 95,
+          activityCount: 2,
+          avatar: "https://via.placeholder.com/150",
+        },
+        {
+          userId: "mockUser3",
+          points: 60,
+          activityCount: 1,
+          avatar: "https://via.placeholder.com/150",
+        },
+      ];
+    }
     try {
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
@@ -315,10 +339,20 @@ export class PointService {
         },
       });
 
+      // Get user avatars separately
+      const userIds = results.map(r => r.userId);
+      const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, avatarUrl: true },
+      });
+
+      const userMap = new Map(users.map(u => [u.id, u.avatarUrl]));
+
       return results.map((result) => ({
         userId: result.userId,
         points: result._sum.point || 0,
         activityCount: result._count.id,
+        avatar: userMap.get(result.userId) || undefined,
       }));
     } catch (error) {
       console.error("Failed to get all user points by date:", error);
