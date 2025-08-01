@@ -159,6 +159,7 @@ router.post(
             username: user.username,
             walletAddress: user.walletAddress,
           }),
+          user
         });
       } else {
         res.status(400).json({ message: "Failed to update profile" });
