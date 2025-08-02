@@ -3,10 +3,12 @@ import { pubClient, redis, subClient } from "../../lib/redis";
 import { sendMessageSchema, Message } from "../../validation/chat.validation";
 import { ChatEvent } from "../../config/websocket";
 import ChatDBService from "../../service/chat-db.service";
+import { RoomStateService } from "../../service/room-state.service";
 import { RedisHash } from "../../config/redis-hash";
 
 export class ChatReceiverController {
   private chatDBService: ChatDBService;
+  private roomStateService: RoomStateService;
   private socket: Socket;
 
   private roomId: string;
@@ -22,6 +24,7 @@ export class ChatReceiverController {
     this.socket = socket;
 
     this.chatDBService = new ChatDBService();
+    this.roomStateService = new RoomStateService();
     this.roomId = roomId;
     this.senderId = senderId;
     this.receiverId = receiverId;
@@ -40,6 +43,18 @@ export class ChatReceiverController {
     try {
       // Join the room
       this.socket.join(this.roomId);
+
+      // Ensure room state is initialized (fallback for rooms not created via match service)
+      const roomStateExists = await redis.exists(`room:${this.roomId}`);
+      if (!roomStateExists) {
+        console.log(`Room state not found for ${this.roomId}, initializing...`);
+        await this.roomStateService.initializeRoomState(
+          this.roomId,
+          "chat",
+          this.senderId,
+          this.receiverId
+        );
+      }
 
       // Add socket to room in Redis
       await redis.sadd(`chat:rooms:${this.roomId}`, this.socket.id);

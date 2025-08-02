@@ -32,11 +32,11 @@ function validateRoomId(roomId: string): boolean {
 
 export function setupCallHandlers(io: Server) {
   io.of("/call").on("connection", (socket: Socket) => {
-    console.log("[Call] Client connected:", socket.id);
-    const authToken = socket.handshake.auth.token;
-    const {roomId, senderId, receiverId} = verifyToken(authToken);
+    // console.log("[Call] Client connected:", socket.id);
+    // const authToken = socket.handshake.auth.token;
+    // const {roomId, senderId, receiverId} = verifyToken(authToken);
     
-    console.log("[Call] Extracted from token:", { roomId, senderId, receiverId });
+    // console.log("[Call] Extracted from token:", { roomId, senderId, receiverId });
 
     socket.on("connect", () => {
       console.log("[Call] Socket connected:", socket.id);
@@ -236,77 +236,77 @@ export function setupCallHandlers(io: Server) {
     // });
 
     // Handle WebRTC signaling
-    socket.on("signal", (data: { signal: any; to: string; from: string;}) => {
-      try {
-        console.log("[Call] Received signal:", {
-          from: data.from,
-          to: data.to,
-          room: roomId,
-          signalType: data.signal?.type,
-          timestamp: new Date().toISOString()
-        });
+    // socket.on("signal", (data: { signal: any; to: string; from: string;}) => {
+    //   try {
+    //     console.log("[Call] Received signal:", {
+    //       from: data.from,
+    //       to: data.to,
+    //       room: roomId,
+    //       signalType: data.signal?.type,
+    //       timestamp: new Date().toISOString()
+    //     });
 
-        // Forward the signal to the target peer
-        socket.to(data.to).emit("signal", {
-          signal: data.signal,
-          from: data.from,
-          room: roomId
-        });
+    //     // Forward the signal to the target peer
+    //     socket.to(data.to).emit("signal", {
+    //       signal: data.signal,
+    //       from: data.from,
+    //       room: roomId
+    //     });
         
-        console.log("[Call] Forwarded signal to peer:", {
-          to: data.to,
-          from: data.from,
-          room: roomId
-        });
-      } catch (error) {
-        console.error("[Call] Error handling signal:", {
-          error,
-          from: data.from,
-          to: data.to,
-          room: roomId
-        });
-      }
-    });
+    //     console.log("[Call] Forwarded signal to peer:", {
+    //       to: data.to,
+    //       from: data.from,
+    //       room: roomId
+    //     });
+    //   } catch (error) {
+    //     console.error("[Call] Error handling signal:", {
+    //       error,
+    //       from: data.from,
+    //       to: data.to,
+    //       room: roomId
+    //     });
+    //   }
+    // });
 
-    // Handle heartbeat
-    socket.on(CallEvent.HEARTBEAT, (roomId: string) => {
-      try {
-        console.log("[Call] Received heartbeat:", {
-          socketId: socket.id,
-          roomId,
-          timestamp: new Date().toISOString()
-        });
+    // // Handle heartbeat
+    // socket.on(CallEvent.HEARTBEAT, (roomId: string) => {
+    //   try {
+    //     console.log("[Call] Received heartbeat:", {
+    //       socketId: socket.id,
+    //       roomId,
+    //       timestamp: new Date().toISOString()
+    //     });
         
-        // Broadcast heartbeat to room
-        socket.to(roomId).emit(CallEvent.HEARTBEAT, {
-          from: socket.id,
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error("[Call] Error handling heartbeat:", {
-          error,
-          socketId: socket.id,
-          roomId
-        });
-      }
-    });
+    //     // Broadcast heartbeat to room
+    //     socket.to(roomId).emit(CallEvent.HEARTBEAT, {
+    //       from: socket.id,
+    //       timestamp: new Date().toISOString()
+    //     });
+    //   } catch (error) {
+    //     console.error("[Call] Error handling heartbeat:", {
+    //       error,
+    //       socketId: socket.id,
+    //       roomId
+    //     });
+    //   }
+    // });
 
-    // Handle user-joined event
-    socket.on("user-joined", (data: { userId: string; room: CallRoom }) => {
-      try {
-        console.log("[Call] User joined event:", {
-          userId: data.userId,
-          roomId,
-          participants: [...data.room.participants],
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error("[Call] Error handling user-joined event:", {
-          error,
-          userId: data.userId,
-          room: roomId
-        });
-      }
-    });
+    // // Handle user-joined event
+    // socket.on("user-joined", (data: { userId: string; room: CallRoom }) => {
+    //   try {
+    //     console.log("[Call] User joined event:", {
+    //       userId: data.userId,
+    //       roomId,
+    //       participants: [...data.room.participants],
+    //       timestamp: new Date().toISOString()
+    //     });
+    //   } catch (error) {
+    //     console.error("[Call] Error handling user-joined event:", {
+    //       error,
+    //       userId: data.userId,
+    //       room: roomId
+    //     });
+    //   }
+    // });
   });
 }

@@ -21,39 +21,94 @@ export class RoomStateService {
     this.heartbeat = this.heartbeat.bind(this);
     this.makeDisconnect = this.makeDisconnect.bind(this);
     this.removeDisconnectedUsers = this.removeDisconnectedUsers.bind(this);
+    this.initializeRoomState = this.initializeRoomState.bind(this);
   }
 
-  async heartbeat(roomId: string, userId: string): Promise<boolean> {
+  async heartbeat(
+    roomId: string,
+    userId: string
+  ): Promise<{ success: boolean; error?: string; index?: number }> {
     try {
       const timenow: number = Date.now();
       const roomStateRaw = await redis.get(`room:${roomId}`);
 
       if (!roomStateRaw) {
-        return false;
+        return {
+          success: false,
+          error: `Room state not found for room ${roomId}. Room may not be initialized yet.`,
+        };
       }
 
       const roomState = JSON.parse(roomStateRaw) as RoomState;
 
       let userUpdated = false;
+      let heartbeatCount = 0;
 
       if (roomState.user1.id === userId) {
         roomState.user1.lastHeartbeat = timenow;
         roomState.user1.heartbeatCount++;
+        heartbeatCount = roomState.user1.heartbeatCount;
         userUpdated = true;
       } else if (roomState.user2.id === userId) {
         roomState.user2.lastHeartbeat = timenow;
         roomState.user2.heartbeatCount++;
+        heartbeatCount = roomState.user2.heartbeatCount;
         userUpdated = true;
       }
 
       if (!userUpdated) {
-        return false; // user not found in the room
+        return {
+          success: false,
+          error: `User ${userId} not found in room ${roomId}. Expected users: ${roomState.user1.id}, ${roomState.user2.id}`,
+        };
       }
 
       await redis.set(`room:${roomId}`, JSON.stringify(roomState));
-      return true;
+      return { success: true, index: heartbeatCount };
     } catch (error) {
       console.error(`Heartbeat error for room ${roomId}:`, error);
+      return {
+        success: false,
+        error: `Internal error during heartbeat processing: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      };
+    }
+  }
+
+  async initializeRoomState(
+    roomId: string,
+    roomType: "chat" | "call",
+    user1Id: string,
+    user2Id: string
+  ): Promise<boolean> {
+    try {
+      const timenow: number = Date.now();
+
+      const roomState: RoomState = {
+        roomId,
+        roomType,
+        user1: {
+          id: user1Id,
+          lastHeartbeat: timenow,
+          heartbeatCount: 0,
+          state: "online",
+        },
+        user2: {
+          id: user2Id,
+          lastHeartbeat: timenow,
+          heartbeatCount: 0,
+          state: "online",
+        },
+      };
+
+      await redis.set(`room:${roomId}`, JSON.stringify(roomState));
+      console.log(
+        `Room state initialized for room ${roomId} with users ${user1Id} and ${user2Id}`
+      );
+      return true;
+    } catch (error) {
+      console.error(`Error initializing room state for room ${roomId}:`, error);
       return false;
     }
   }

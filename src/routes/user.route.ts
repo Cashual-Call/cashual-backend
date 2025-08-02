@@ -2,6 +2,7 @@ import { Router, RequestHandler } from "express";
 import { UserController } from "../controller/user.controller";
 import { validateResponse } from "../middleware/validate.middleware";
 import friendRouter from "./friend.route";
+import notificationRouter from "./notification.route";
 
 const userController = new UserController();
 
@@ -20,6 +21,7 @@ router.get("/points-by-date", userController.getUserPointsByDate as RequestHandl
 router.get("/rankings", validateResponse, userController.getRankings as RequestHandler);
 
 router.use("/friends", friendRouter);
+router.use("/notifications", notificationRouter);
 
 // Create a new user
 // router.post("/", createUser as RequestHandler);

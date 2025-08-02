@@ -2,6 +2,7 @@ import { AvailableUserService } from "./available-user.service";
 import { redis } from "../lib/redis";
 import { generateToken } from "../middleware/socket.middleware";
 import RoomService from "./room.service";
+import { RoomStateService } from "./room-state.service";
 import { RoomType } from "@prisma/client";
 
 interface MatchPayload {
@@ -14,6 +15,7 @@ export class MatchService {
   private searchType: string;
   private availableUserService: AvailableUserService;
   private roomService: RoomService;
+  private roomStateService: RoomStateService;
 
   constructor(searchType: string) {
     this.searchType = searchType;
@@ -21,6 +23,7 @@ export class MatchService {
     this.roomService = new RoomService(
       searchType === "chat" ? RoomType.CHAT : RoomType.CALL
     );
+    this.roomStateService = new RoomStateService();
   }
 
   async addUser(userId: string, interests: string[]) {
@@ -47,6 +50,20 @@ export class MatchService {
   async setMatch(user1: string, user2: string) {
     const room = await this.roomService.createRoom(user1, user2);
     const roomId = room.id;
+    
+    // Initialize room state for heartbeat tracking
+    const roomType = this.searchType as "chat" | "call";
+    const roomStateInitialized = await this.roomStateService.initializeRoomState(
+      roomId, 
+      roomType, 
+      user1, 
+      user2
+    );
+    
+    if (!roomStateInitialized) {
+      console.warn(`Failed to initialize room state for room ${roomId}`);
+    }
+    
     const token1 = generateToken({
       senderId: user1,
       receiverId: user2,

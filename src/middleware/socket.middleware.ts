@@ -49,23 +49,14 @@ export const verifyToken = (token: string) => {
     if (!token) {
       throw new Error("No token provided");
     }
-    
-    // Try JWT first
-    try {
-      return jwt.verify(token, secret) as SocketJWTPayload;
-    } catch (jwtError) {
-      // Fallback to base64 for testing (remove in production)
-      console.log("JWT failed, trying base64 decode for testing...");
-      const decoded = JSON.parse(atob(token));
-      if (decoded.roomId && decoded.senderId && decoded.receiverId) {
-        return {
-          roomId: decoded.roomId,
-          senderId: decoded.senderId,
-          receiverId: decoded.receiverId,
-        };
-      }
+
+    const decoded = jwt.verify(token, secret) as SocketJWTPayload;
+
+    if (!decoded.roomId || !decoded.senderId || !decoded.receiverId) {
       throw new Error("Invalid token format");
     }
+
+    return decoded;
   } catch (error) {
     console.error("Token verification failed:", error);
 

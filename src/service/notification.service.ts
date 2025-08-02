@@ -468,6 +468,423 @@ export class NotificationService {
     }
   }
 
+  /**
+   * Get user's notification preferences
+   */
+  async getNotificationPreferences(userId: string): Promise<any> {
+    try {
+      // Check if user exists
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { 
+          id: true
+        }
+      });
+
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Check cache for stored preferences
+      const cacheKey = `user_preferences:${userId}`;
+      const cachedPreferences = await redis.get(cacheKey);
+
+      if (cachedPreferences) {
+        return JSON.parse(cachedPreferences);
+      }
+
+      // Return default preferences if none cached
+      const defaultPreferences = {
+        pushNotifications: true,
+        emailNotifications: true,
+        types: {
+          [NotificationType.FRIEND_REQUEST]: true,
+          [NotificationType.FRIEND_ACCEPTED]: true,
+          [NotificationType.NEW_MESSAGE]: true,
+          [NotificationType.CALL_INCOMING]: true,
+          [NotificationType.CALL_MISSED]: true,
+          [NotificationType.MATCH_FOUND]: true,
+          [NotificationType.SYSTEM_ANNOUNCEMENT]: true,
+          [NotificationType.POINTS_EARNED]: true,
+          [NotificationType.ACHIEVEMENT_UNLOCKED]: true,
+          [NotificationType.SUBSCRIPTION_EXPIRING]: true,
+          [NotificationType.SUBSCRIPTION_EXPIRED]: true,
+        },
+      };
+
+      return defaultPreferences;
+    } catch (error) {
+      logger.error(`Failed to get notification preferences for user ${userId}:`, error);
+      throw new Error(`Failed to get notification preferences: ${error}`);
+    }
+  }
+
+  /**
+   * Update user's notification preferences
+   */
+  async updateNotificationPreferences(userId: string, preferences: any): Promise<any> {
+    try {
+      // Verify user exists
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true }
+      });
+
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // For now, we'll just cache the preferences in Redis since we don't have schema fields
+      // In production, you'd want to add these fields to the User model or create a separate table
+      const cacheKey = `user_preferences:${userId}`;
+      await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(preferences));
+
+      await this.invalidateUserCache(userId);
+
+      logger.info(`Updated notification preferences for user ${userId}`);
+
+      return preferences;
+    } catch (error) {
+      logger.error(`Failed to update notification preferences for user ${userId}:`, error);
+      throw new Error(`Failed to update notification preferences: ${error}`);
+    }
+  }
+
+  /**
+   * Delete a specific notification
+   */
+  async deleteNotification(notificationId: string, userId: string): Promise<void> {
+    try {
+      const notification = await prisma.notification.findFirst({
+        where: {
+          id: notificationId,
+          userId: userId
+        }
+      });
+
+      if (!notification) {
+        throw new Error("Notification not found or not owned by user");
+      }
+
+      await prisma.notification.delete({
+        where: { id: notificationId }
+      });
+
+      await this.invalidateUserCache(userId);
+
+      logger.info(`Notification ${notificationId} deleted for user ${userId}`);
+    } catch (error) {
+      logger.error(`Failed to delete notification ${notificationId}:`, error);
+      throw new Error(`Failed to delete notification: ${error}`);
+    }
+  }
+
+  /**
+   * Clear all notifications for a user
+   */
+  async clearAllNotifications(userId: string): Promise<number> {
+    try {
+      const result = await prisma.notification.deleteMany({
+        where: { userId }
+      });
+
+      await this.invalidateUserCache(userId);
+
+      logger.info(`Cleared ${result.count} notifications for user ${userId}`);
+      return result.count;
+    } catch (error) {
+      logger.error(`Failed to clear all notifications for user ${userId}:`, error);
+      throw new Error(`Failed to clear all notifications: ${error}`);
+    }
+  }
+
+  /**
+   * Perform bulk actions on notifications
+   */
+  async bulkActions(userId: string, action: string, notificationIds: string[]): Promise<any> {
+    try {
+      let result;
+
+      if (action === 'mark_read') {
+        result = await prisma.notification.updateMany({
+          where: {
+            id: { in: notificationIds },
+            userId: userId
+          },
+          data: {
+            isRead: true,
+            readAt: new Date()
+          }
+        });
+      } else if (action === 'delete') {
+        result = await prisma.notification.deleteMany({
+          where: {
+            id: { in: notificationIds },
+            userId: userId
+          }
+        });
+      } else {
+        throw new Error(`Invalid action: ${action}`);
+      }
+
+      await this.invalidateUserCache(userId);
+
+      logger.info(`Bulk ${action} performed on ${result.count} notifications for user ${userId}`);
+      
+      return {
+        action,
+        processedCount: result.count,
+        requestedCount: notificationIds.length
+      };
+    } catch (error) {
+      logger.error(`Failed to perform bulk ${action} for user ${userId}:`, error);
+      throw new Error(`Failed to perform bulk ${action}: ${error}`);
+    }
+  }
+
+  /**
+   * Get notification analytics
+   */
+  async getNotificationAnalytics(timeframe: string): Promise<any> {
+    try {
+      const now = new Date();
+      let startDate: Date;
+
+      // Calculate start date based on timeframe
+      switch (timeframe) {
+        case '1d':
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '30d':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case '90d':
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      }
+
+      // Get notification statistics
+      const [
+        totalNotifications,
+        notificationsByType,
+        readNotifications,
+        pushSubscriptions
+      ] = await Promise.all([
+        // Total notifications in timeframe
+        prisma.notification.count({
+          where: {
+            createdAt: { gte: startDate }
+          }
+        }),
+
+        // Notifications by type
+        prisma.notification.groupBy({
+          by: ['type'],
+          where: {
+            createdAt: { gte: startDate }
+          },
+          _count: {
+            type: true
+          }
+        }),
+
+        // Read rate - count read notifications
+        prisma.notification.count({
+          where: {
+            createdAt: { gte: startDate },
+            isRead: true
+          }
+        }),
+
+        // Active push subscriptions
+        prisma.pushSubscription.count({
+          where: {
+            isActive: true
+          }
+        })
+      ]);
+
+      const readRatePercentage = totalNotifications > 0 
+        ? (readNotifications / totalNotifications) * 100 
+        : 0;
+
+      return {
+        timeframe,
+        period: {
+          start: startDate,
+          end: now
+        },
+        summary: {
+          totalNotifications,
+          readRate: Math.round(readRatePercentage * 100) / 100,
+          activePushSubscriptions: pushSubscriptions
+        },
+        breakdown: {
+          byType: notificationsByType.map(item => ({
+            type: item.type,
+            count: item._count.type
+          }))
+        }
+      };
+    } catch (error) {
+      logger.error(`Failed to get notification analytics:`, error);
+      throw new Error(`Failed to get notification analytics: ${error}`);
+    }
+  }
+
+  /**
+   * Broadcast notification to multiple users
+   */
+  async broadcastNotification(userIds: string[], notification: NotificationData): Promise<any> {
+    try {
+      const results = {
+        successCount: 0,
+        failureCount: 0,
+        failures: [] as Array<{ userId: string; error: string }>
+      };
+
+      // Process in batches to avoid overwhelming the system
+      const batchSize = 100;
+      for (let i = 0; i < userIds.length; i += batchSize) {
+        const batch = userIds.slice(i, i + batchSize);
+        
+        await Promise.allSettled(
+          batch.map(async (userId) => {
+            try {
+              await this.sendNotification(userId, notification);
+              results.successCount++;
+            } catch (error) {
+              results.failureCount++;
+              results.failures.push({
+                userId,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              });
+            }
+          })
+        );
+      }
+
+      logger.info(`Broadcast notification sent to ${results.successCount}/${userIds.length} users`);
+      return results;
+    } catch (error) {
+      logger.error(`Failed to broadcast notification:`, error);
+      throw new Error(`Failed to broadcast notification: ${error}`);
+    }
+  }
+
+  /**
+   * Schedule a notification for later
+   */
+  async scheduleNotification(userId: string, notification: NotificationData, scheduledFor: Date): Promise<any> {
+    try {
+      // For now, store as a regular notification with scheduled info in data field
+      // In production, you'd want to use a job queue like Bull/Agenda
+      const scheduledNotification = await prisma.notification.create({
+        data: {
+          userId,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          data: {
+            ...notification.data,
+            scheduled: true,
+            scheduledFor: scheduledFor.toISOString()
+          },
+          isSent: false
+        }
+      });
+
+      // TODO: Add to job queue for actual scheduling
+      logger.info(`Notification scheduled for user ${userId} at ${scheduledFor}`);
+      
+      return {
+        id: scheduledNotification.id,
+        scheduledFor,
+        status: 'scheduled'
+      };
+    } catch (error) {
+      logger.error(`Failed to schedule notification for user ${userId}:`, error);
+      throw new Error(`Failed to schedule notification: ${error}`);
+    }
+  }
+
+  /**
+   * Get notification history with advanced filters
+   */
+  async getNotificationHistory(userId: string, filters: any): Promise<any> {
+    try {
+      const {
+        startDate,
+        endDate,
+        types,
+        read,
+        sent,
+        page = 1,
+        limit = 50
+      } = filters;
+
+      const where: any = {
+        userId
+      };
+
+      if (startDate || endDate) {
+        where.createdAt = {};
+        if (startDate) where.createdAt.gte = startDate;
+        if (endDate) where.createdAt.lte = endDate;
+      }
+
+      if (types && types.length > 0) {
+        where.type = { in: types };
+      }
+
+      if (read !== undefined) {
+        where.isRead = read;
+      }
+
+      if (sent !== undefined) {
+        where.isSent = sent;
+      }
+
+      const skip = (page - 1) * limit;
+
+      const [notifications, total] = await Promise.all([
+        prisma.notification.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true
+              }
+            }
+          }
+        }),
+        prisma.notification.count({ where })
+      ]);
+
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        notifications,
+        page,
+        limit,
+        total,
+        totalPages
+      };
+    } catch (error) {
+      logger.error(`Failed to get notification history for user ${userId}:`, error);
+      throw new Error(`Failed to get notification history: ${error}`);
+    }
+  }
+
   // Helper methods for different notification types
   static readonly NotificationTypes = {
     FRIEND_REQUEST: (username: string) => ({
