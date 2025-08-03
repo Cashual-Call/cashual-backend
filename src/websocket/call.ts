@@ -5,6 +5,14 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { CallEvent } from "../config/websocket";
 import { verifyToken } from "../middleware/socket.middleware";
 
+enum SocketEvents {
+  SEND_OFFER = 'send-offer',
+  OFFER = 'offer',
+  ANSWER = 'answer',
+  LOBBY = 'lobby',
+  ADD_ICE_CANDIDATE = 'add-ice-candidate'
+}
+
 // TODO: Implement user points tracking and related endpoints in user service
 const MAX_PARTICIPANTS = 10e6;
 const RATE_LIMIT = {
@@ -25,288 +33,180 @@ interface CallRoom {
   endTime?: Date;
 }
 
+interface CallUser {
+  socketId: string;
+  socket: Socket;
+  joinedAt: Date;
+}
+
+class CallUserManager {
+  private users: Map<string, CallUser> = new Map();
+  private queue: string[] = [];
+  private rooms: Map<string, CallRoom> = new Map();
+  private userRooms: Map<string, string> = new Map(); // socketId -> roomId
+  private roomCounter = 1;
+
+  addUser(socket: Socket) {
+    const user: CallUser = {
+      socketId: socket.id,
+      socket,
+      joinedAt: new Date()
+    };
+    
+    this.users.set(socket.id, user);
+    this.queue.push(socket.id);
+    
+    console.log(`[Call] User ${socket.id} added to queue. Queue length: ${this.queue.length}`);
+    
+    // Emit lobby event to let user know they're waiting
+    socket.emit(SocketEvents.LOBBY);
+    
+    // Try to match users
+    this.tryMatchUsers();
+  }
+
+  removeUser(socketId: string) {
+    // Clean up room if user was in one
+    const roomId = this.userRooms.get(socketId);
+    if (roomId) {
+      this.handleUserLeaveRoom(roomId, socketId);
+    }
+    
+    // Remove from queue and users
+    this.queue = this.queue.filter(id => id !== socketId);
+    this.users.delete(socketId);
+    this.userRooms.delete(socketId);
+    
+    console.log(`[Call] User ${socketId} removed. Remaining users: ${this.users.size}`);
+  }
+
+  private tryMatchUsers() {
+    if (this.queue.length < 2) {
+      return;
+    }
+
+    const user1Id = this.queue.shift()!;
+    const user2Id = this.queue.shift()!;
+    
+    const user1 = this.users.get(user1Id);
+    const user2 = this.users.get(user2Id);
+
+    if (!user1 || !user2) {
+      console.log(`[Call] Failed to match users - one or both users not found`);
+      return;
+    }
+
+    this.createRoom(user1, user2);
+  }
+
+  private createRoom(user1: CallUser, user2: CallUser) {
+    const roomId = `room_${this.roomCounter++}`;
+    
+    const room: CallRoom = {
+      id: roomId,
+      participants: [user1.socketId, user2.socketId],
+      status: "active",
+      startTime: new Date()
+    };
+
+    this.rooms.set(roomId, room);
+    this.userRooms.set(user1.socketId, roomId);
+    this.userRooms.set(user2.socketId, roomId);
+
+    console.log(`[Call] Created room ${roomId} for users ${user1.socketId} and ${user2.socketId}`);
+
+    // Emit send-offer to user1 (initiator)
+    user1.socket.emit(SocketEvents.SEND_OFFER, { roomId });
+    
+    // User2 will wait for the offer
+    user2.socket.emit(SocketEvents.LOBBY, { roomId, waiting: true });
+  }
+
+  private handleUserLeaveRoom(roomId: string, socketId: string) {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    // Find the other user in the room
+    const otherUserId = room.participants.find(id => id !== socketId);
+    if (otherUserId) {
+      const otherUser = this.users.get(otherUserId);
+      if (otherUser) {
+        // Put the other user back in lobby
+        otherUser.socket.emit(SocketEvents.LOBBY);
+        this.queue.push(otherUserId);
+        this.userRooms.delete(otherUserId);
+      }
+    }
+
+    // Clean up room
+    this.rooms.delete(roomId);
+    this.userRooms.delete(socketId);
+    
+    console.log(`[Call] Room ${roomId} cleaned up after user ${socketId} left`);
+  }
+
+  forwardToRoom(roomId: string, senderSocketId: string, event: string, data: any) {
+    const room = this.rooms.get(roomId);
+    if (!room) {
+      console.log(`[Call] Room ${roomId} not found for event ${event}`);
+      return;
+    }
+
+    // Find the other user in the room
+    const receiverSocketId = room.participants.find(id => id !== senderSocketId);
+    if (!receiverSocketId) {
+      console.log(`[Call] No receiver found in room ${roomId} for event ${event}`);
+      return;
+    }
+
+    const receiverUser = this.users.get(receiverSocketId);
+    if (!receiverUser) {
+      console.log(`[Call] Receiver user ${receiverSocketId} not found for event ${event}`);
+      return;
+    }
+
+    // Forward the event to the other user
+    receiverUser.socket.emit(event, { ...data, roomId });
+    console.log(`[Call] Forwarded ${event} from ${senderSocketId} to ${receiverSocketId} in room ${roomId}`);
+  }
+}
+
 function validateRoomId(roomId: string): boolean {
   // Add your room ID validation logic here
   return /^[a-zA-Z0-9-_]{3,50}$/.test(roomId);
 }
 
 export function setupCallHandlers(io: Server) {
+  const userManager = new CallUserManager();
+  
   io.of("/call").on("connection", (socket: Socket) => {
-    // console.log("[Call] Client connected:", socket.id);
-    // const authToken = socket.handshake.auth.token;
-    // const {roomId, senderId, receiverId} = verifyToken(authToken);
+    console.log("[Call] Socket connected:", socket.id);
     
-    // console.log("[Call] Extracted from token:", { roomId, senderId, receiverId });
-
-    socket.on("connect", () => {
-      console.log("[Call] Socket connected:", socket.id);
-    });
+    // Add user to queue automatically
+    userManager.addUser(socket);
 
     socket.on("disconnect", (reason) => {
       console.log("[Call] Socket disconnected:", socket.id, "Reason:", reason);
-      // Optionally, handle cleanup here if needed
+      userManager.removeUser(socket.id);
     });
-    
-    // Auto-emit join-room for the client after connection
-    // setTimeout(() => {
-    //   socket.emit("join-room-auto");
-    // }, 100);
 
-    // // Join a call room
-    // socket.on(CallEvent.JOIN_ROOM, async () => {
-    //   try {
-    //     console.log("[Call] Attempting to join room:", roomId);
-    //     // Rate limiting
-    //     await rateLimiter.consume(socket.id);
+    // Handle WebRTC signaling with room-based forwarding
+    socket.on(SocketEvents.OFFER, (data: { sdp: any, roomId: string }) => {
+      console.log(`[Call] Received offer from ${socket.id} for room ${data.roomId}`);
+      userManager.forwardToRoom(data.roomId, socket.id, SocketEvents.OFFER, { sdp: data.sdp });
+    });
 
-    //     // Validate room ID
-    //     if (!validateRoomId(roomId)) {
-    //       console.log("[Call] Invalid room ID format:", roomId);
-    //       throw new Error("Invalid room ID format");
-    //     }
+    socket.on(SocketEvents.ANSWER, (data: { sdp: any, roomId: string }) => {
+      console.log(`[Call] Received answer from ${socket.id} for room ${data.roomId}`);
+      userManager.forwardToRoom(data.roomId, socket.id, SocketEvents.ANSWER, { sdp: data.sdp });
+    });
 
-    //     socket.join(roomId);
-    //     console.log("[Call] Socket joined room:", roomId);
-
-    //     // Get or create call room
-    //     const roomKey = `call:${roomId}`;
-    //     let room: CallRoom;
-
-    //     const existingRoom = await redis.get(roomKey);
-    //     if (existingRoom) {
-    //       console.log("[Call] Existing room found:", roomId);
-    //       room = JSON.parse(existingRoom);
-          
-    //       // Check participant limit
-    //       if (room.participants.length >= MAX_PARTICIPANTS) {
-    //         console.log("[Call] Room is full:", { roomId, participants: room.participants });
-    //         throw new Error("Room is full");
-    //       }
-          
-    //       if (!room.participants.includes(socket.id)) {
-    //         room.participants.push(socket.id);
-    //         await redis.set(roomKey, JSON.stringify(room));
-    //         console.log("[Call] Added participant to room:", { roomId, participant: socket.id });
-    //       }
-    //     } else {
-    //       console.log("[Call] Creating new room:", roomId);
-    //       room = {
-    //         id: roomId,
-    //         participants: [socket.id],
-    //         status: "active",
-    //         startTime: new Date(),
-    //       };
-    //       await redis.set(roomKey, JSON.stringify(room));
-    //     }
-
-    //     // Notify others in the room
-    //     socket.to(roomId).emit("user-joined", { userId: socket.id, room });
-    //     console.log("[Call] Notified room of new participant:", { roomId, userId: socket.id });
-
-    //     // Send room state to the new participant
-    //     socket.emit("roomState", room);
-    //     console.log("[Call] Sent room state to participant:", { roomId, userId: socket.id });
-
-    //     // If this is the first participant, they wait for others
-    //     // If this is the second participant, trigger offer creation
-    //     if (room.participants.length === 1) {
-    //       console.log("[Call] First participant, waiting for others...");
-    //       socket.emit("lobby");
-    //     } else if (room.participants.length === 2) {
-    //       console.log("[Call] Second participant joined, initiating call...");
-    //       // Tell the first participant to send an offer
-    //       socket.to(room.participants[0]).emit("send-offer", { roomId });
-    //       console.log("[Call] Sent send-offer to first participant:", room.participants[0]);
-    //     }
-    //   } catch (error: unknown) {
-    //     console.error("[Call] Error joining call:", { roomId, error });
-    //     if (error instanceof Error && error.name === "RateLimiterError") {
-    //       socket.emit("error", "Too many requests. Please try again later.");
-    //     } else {
-    //       socket.emit("error", error instanceof Error ? error.message : "Failed to join call");
-    //     }
-    //   }
-    // });
-
-    // // Handle WebRTC offer
-    // socket.on(CallEvent.OFFER, (data: { offer: any }) => {
-    //   console.log("[Call] Received offer:", { roomId });
-    //   socket.to(roomId).emit("offer", {
-    //     roomId,
-    //     sdp: data.offer,
-    //   });
-    // });
-
-    // // Handle WebRTC answer
-    // socket.on(CallEvent.ANSWER, (data: { answer: any }) => {
-    //   console.log("[Call] Received answer:", { roomId });
-    //   socket.to(roomId).emit("answer", {
-    //     roomId,
-    //     sdp: data.answer,
-    //   });
-    // });
-
-    // // Handle ICE candidates
-    // socket.on(CallEvent.CANDIDATE, (data: { candidate: any }) => {
-    //   console.log("[Call] Received ICE candidate:", { roomId });
-    //   socket.to(roomId).emit("candidate", {
-    //     candidate: data.candidate,
-    //   });
-    // });
-
-    // // Handle call end
-    // socket.on(CallEvent.END_CALL, async () => {
-    //   try {
-    //     console.log("[Call] Ending call:", roomId);
-    //     const roomKey = `call:${roomId}`;
-    //     const room = await redis.get(roomKey);
-
-    //     if (room) {
-    //       const callRoom: CallRoom = JSON.parse(room);
-    //       callRoom.status = "ended";
-    //       callRoom.endTime = new Date();
-
-    //       // Save call history to database
-    //       await prisma.call.create({
-    //         data: {
-    //           initiatorId: callRoom.participants[0],
-    //           receiverId: callRoom.participants[1],
-    //           durationSec: Math.floor(
-    //             (callRoom.endTime.getTime() - callRoom.startTime.getTime()) /
-    //               1000
-    //           ),
-    //           startedAt: callRoom.startTime,
-    //           endedAt: callRoom.endTime,
-    //         },
-    //       });
-    //       console.log("[Call] Saved call history to database:", { roomId });
-
-    //       // Clean up Redis
-    //       await redis.del(roomKey);
-    //       console.log("[Call] Cleaned up Redis for room:", roomId);
-
-    //       // Notify all participants
-    //       io.of("/call").to(roomId).emit("callEnded", callRoom);
-    //       console.log("[Call] Notified participants of call end:", roomId);
-    //     }
-    //   } catch (error) {
-    //     console.error("[Call] Error ending call:", { roomId, error });
-    //     socket.emit("error", "Failed to end call");
-    //   }
-    // });
-
-    // // Handle disconnection
-    // socket.on(CallEvent.DISCONNECT, async () => {
-    //   try {
-    //     console.log("[Call] Handling disconnect:", socket.id);
-    //     // Find all rooms the user is in
-    //     const rooms = Array.from(socket.rooms);
-    //     for (const roomId of rooms) {
-    //       if (roomId !== socket.id) {
-    //         // Skip the socket's own room
-    //         const roomKey = `call:${roomId}`;
-    //         const room = await redis.get(roomKey);
-
-    //         if (room) {
-    //           const callRoom: CallRoom = JSON.parse(room);
-    //           callRoom.participants = callRoom.participants.filter(
-    //             (p) => p !== socket.id
-    //           );
-
-    //           if (callRoom.participants.length === 0) {
-    //             // If no participants left, end the call
-    //             await redis.del(roomKey);
-    //             console.log("[Call] No participants left, ending call:", roomId);
-    //             io.of("/call")
-    //               .to(roomId)
-    //               .emit("callEnded", { ...callRoom, status: "ended" });
-    //           } else {
-    //             await redis.set(roomKey, JSON.stringify(callRoom));
-    //             console.log("[Call] Participant left, updating room:", { roomId, remainingParticipants: callRoom.participants });
-    //             socket
-    //               .to(roomId)
-    //               .emit("userLeft", { userId: socket.id, room: callRoom });
-    //           }
-    //         }
-    //       }
-    //     }
-    //   } catch (error) {
-    //     console.error("[Call] Error handling disconnect:", { socketId: socket.id, error });
-    //   }
-    // });
-
-    // Handle WebRTC signaling
-    // socket.on("signal", (data: { signal: any; to: string; from: string;}) => {
-    //   try {
-    //     console.log("[Call] Received signal:", {
-    //       from: data.from,
-    //       to: data.to,
-    //       room: roomId,
-    //       signalType: data.signal?.type,
-    //       timestamp: new Date().toISOString()
-    //     });
-
-    //     // Forward the signal to the target peer
-    //     socket.to(data.to).emit("signal", {
-    //       signal: data.signal,
-    //       from: data.from,
-    //       room: roomId
-    //     });
-        
-    //     console.log("[Call] Forwarded signal to peer:", {
-    //       to: data.to,
-    //       from: data.from,
-    //       room: roomId
-    //     });
-    //   } catch (error) {
-    //     console.error("[Call] Error handling signal:", {
-    //       error,
-    //       from: data.from,
-    //       to: data.to,
-    //       room: roomId
-    //     });
-    //   }
-    // });
-
-    // // Handle heartbeat
-    // socket.on(CallEvent.HEARTBEAT, (roomId: string) => {
-    //   try {
-    //     console.log("[Call] Received heartbeat:", {
-    //       socketId: socket.id,
-    //       roomId,
-    //       timestamp: new Date().toISOString()
-    //     });
-        
-    //     // Broadcast heartbeat to room
-    //     socket.to(roomId).emit(CallEvent.HEARTBEAT, {
-    //       from: socket.id,
-    //       timestamp: new Date().toISOString()
-    //     });
-    //   } catch (error) {
-    //     console.error("[Call] Error handling heartbeat:", {
-    //       error,
-    //       socketId: socket.id,
-    //       roomId
-    //     });
-    //   }
-    // });
-
-    // // Handle user-joined event
-    // socket.on("user-joined", (data: { userId: string; room: CallRoom }) => {
-    //   try {
-    //     console.log("[Call] User joined event:", {
-    //       userId: data.userId,
-    //       roomId,
-    //       participants: [...data.room.participants],
-    //       timestamp: new Date().toISOString()
-    //     });
-    //   } catch (error) {
-    //     console.error("[Call] Error handling user-joined event:", {
-    //       error,
-    //       userId: data.userId,
-    //       room: roomId
-    //     });
-    //   }
-    // });
+    socket.on(SocketEvents.ADD_ICE_CANDIDATE, (data: { candidate: any, type: string, roomId: string }) => {
+      console.log(`[Call] Received ICE candidate from ${socket.id} for room ${data.roomId}`);
+      userManager.forwardToRoom(data.roomId, socket.id, SocketEvents.ADD_ICE_CANDIDATE, { 
+        candidate: data.candidate, 
+        type: data.type 
+      });
+    });
   });
 }
