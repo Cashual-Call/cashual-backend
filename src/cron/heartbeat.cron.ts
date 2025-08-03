@@ -42,7 +42,7 @@ export const addRecurringJob = async () => {
     scheduledTask = null;
   }
   try {
-    scheduledTask = cron.schedule("*/30 * * * * *", processHeartbeatJob);
+    scheduledTask = cron.schedule("*/15 * * * * *", processHeartbeatJob);
     logger.info("[HeartbeatCron] Heartbeat cron job scheduled successfully");
   } catch (error) {
     logger.error("[addRecurringJob] Failed to schedule heartbeat recurring job:", error);

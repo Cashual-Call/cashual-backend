@@ -27,7 +27,7 @@ export class RoomStateService {
   async heartbeat(
     roomId: string,
     userId: string
-  ): Promise<{ success: boolean; error?: string; index?: number }> {
+  ): Promise<{ success: boolean; error?: string; index?: number; state?: IUser }> {
     try {
       const timenow: number = Date.now();
       const roomStateRaw = await redis.get(`room:${roomId}`);
@@ -43,16 +43,19 @@ export class RoomStateService {
 
       let userUpdated = false;
       let heartbeatCount = 0;
+      let userState: any;
 
       if (roomState.user1.id === userId) {
         roomState.user1.lastHeartbeat = timenow;
         roomState.user1.heartbeatCount++;
         heartbeatCount = roomState.user1.heartbeatCount;
+        userState = roomState.user2;
         userUpdated = true;
       } else if (roomState.user2.id === userId) {
         roomState.user2.lastHeartbeat = timenow;
         roomState.user2.heartbeatCount++;
         heartbeatCount = roomState.user2.heartbeatCount;
+        userState = roomState.user2;
         userUpdated = true;
       }
 
@@ -64,7 +67,7 @@ export class RoomStateService {
       }
 
       await redis.set(`room:${roomId}`, JSON.stringify(roomState));
-      return { success: true, index: heartbeatCount };
+      return { success: true, index: heartbeatCount, state: userState };
     } catch (error) {
       console.error(`Heartbeat error for room ${roomId}:`, error);
       return {

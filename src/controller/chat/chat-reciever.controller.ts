@@ -156,6 +156,7 @@ export class ChatReceiverController {
         receiverId: this.receiverId,
         roomId: this.roomId,
         username: this.senderId,
+        type: validatedData.type,
         avatarUrl: "",
         timestamp: new Date().toISOString(),
       };

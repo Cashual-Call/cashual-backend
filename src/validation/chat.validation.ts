@@ -8,6 +8,7 @@ export const messageSchema = z.object({
   username: z.string(),
   avatarUrl: z.string().optional(),
   timestamp: z.string(),
+  type: z.enum(["text", "image", "gif", "audio", "video", "file"]),
 });
 
 export const sendMessageSchema = z.object({
@@ -15,6 +16,7 @@ export const sendMessageSchema = z.object({
   roomId: z.string(),
   timestamp: z.string().transform((str) => new Date(str)),
   senderId: z.string(),
+  type: z.enum(["text", "image", "gif", "audio", "video", "file"]),
 });
 
 export const userJoinedSchema = z.object({
