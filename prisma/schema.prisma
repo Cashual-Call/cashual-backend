@@ -40,6 +40,7 @@ model User {
   ratedRatings       Rating[]           @relation("rated_user_ratings")
   notifications      Notification[]
   pushSubscriptions  PushSubscription[]
+  LuckyWinnerEntry   LuckyWinnerEntry[]
 }
 
 model Rating {
@@ -126,6 +127,15 @@ model LeaderboardEntry {
   @@unique([userId, date])
 }
 
+model LuckyWinnerEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
 model Subscription {
   id        String   @id @default(uuid())
   userId    String
@@ -151,8 +161,8 @@ model Room {
   messages Text[]
 
   // Relations
-  user1 User? @relation("user1_rooms", fields: [user1Id], references: [id])
-  user2 User? @relation("user2_rooms", fields: [user2Id], references: [id])
+  user1 User? @relation("user1_rooms", fields: [user1Id], references: [username])
+  user2 User? @relation("user2_rooms", fields: [user2Id], references: [username])
 
   @@index([user1Id])
   @@index([user2Id])
@@ -169,20 +179,20 @@ model PointActivity {
 }
 
 model Notification {
-  id          String             @id @default(uuid())
-  userId      String
-  type        NotificationType
-  title       String
-  message     String
-  data        Json?              // Additional data for the notification
-  isRead      Boolean            @default(false)
-  isSent      Boolean            @default(false)
-  createdAt   DateTime           @default(now())
-  sentAt      DateTime?
-  readAt      DateTime?
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json? // Additional data for the notification
+  isRead    Boolean          @default(false)
+  isSent    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  sentAt    DateTime?
+  readAt    DateTime?
 
   // Relations
-  user        User               @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [username])
 
   @@index([userId])
   @@index([isRead])
@@ -190,18 +200,18 @@ model Notification {
 }
 
 model PushSubscription {
-  id         String   @id @default(uuid())
-  userId     String
-  endpoint   String
-  p256dh     String
-  auth       String
-  userAgent  String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String
+  p256dh    String
+  auth      String
+  userAgent String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  user       User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [username])
 
   @@unique([userId, endpoint])
   @@index([userId])

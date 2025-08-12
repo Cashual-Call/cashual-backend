@@ -13,7 +13,7 @@ export class HeartbeatController {
     const { roomId, senderId, ...rest } = verifyToken(token);
 
     if (!roomId) {
-      return res.status(400).json({
+      return res.status(406).json({
         success: false,
         error: "Missing Room Id",
       });

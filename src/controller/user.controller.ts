@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { UserService } from "../service/user.service";
 import { redis } from "../lib/redis";
 import { getUserId, verifyUserId } from "../utils/user-id";
+import { prisma } from "../lib/prisma";
 
 export class UserController {
   private userService: UserService;
@@ -37,10 +38,10 @@ export class UserController {
         avatarUrl,
         walletAddress,
       });
-      
+
       // Invalidate users list cache
-      await redis.del('users:all');
-      
+      await redis.del("users:all");
+
       res.status(201).json(user);
     } catch (error) {
       if (error instanceof Error) {
@@ -58,7 +59,7 @@ export class UserController {
   getUserById = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      
+
       // Try to get from cache first
       const cachedUser = await redis.get(`user:${id}`);
       if (cachedUser) {
@@ -83,16 +84,16 @@ export class UserController {
   getAllUsers = async (req: Request, res: Response) => {
     try {
       // Try to get from cache first
-      const cachedUsers = await redis.get('users:all');
+      const cachedUsers = await redis.get("users:all");
       if (cachedUsers) {
         return res.json(JSON.parse(cachedUsers));
       }
 
       const users = await this.userService.getAllUsers();
-      
+
       // Cache the users list
-      await redis.setex('users:all', this.CACHE_TTL, JSON.stringify(users));
-      
+      await redis.setex("users:all", this.CACHE_TTL, JSON.stringify(users));
+
       res.json(users);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
@@ -102,7 +103,8 @@ export class UserController {
   updateUser = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { username, publicKey, gender, avatarUrl, isPro, proEnd } = req.body;
+      const { username, publicKey, gender, avatarUrl, isPro, proEnd } =
+        req.body;
 
       const user = await this.userService.updateUser(id, {
         username,
@@ -114,10 +116,7 @@ export class UserController {
       });
 
       // Invalidate caches
-      await Promise.all([
-        redis.del(`user:${id}`),
-        redis.del('users:all')
-      ]);
+      await Promise.all([redis.del(`user:${id}`), redis.del("users:all")]);
 
       res.json(user);
     } catch (error) {
@@ -139,13 +138,10 @@ export class UserController {
     try {
       const { id } = req.params;
       await this.userService.deleteUser(id);
-      
+
       // Invalidate caches
-      await Promise.all([
-        redis.del(`user:${id}`),
-        redis.del('users:all')
-      ]);
-      
+      await Promise.all([redis.del(`user:${id}`), redis.del("users:all")]);
+
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete user" });
@@ -158,13 +154,10 @@ export class UserController {
       const { isBanned } = req.body;
 
       const user = await this.userService.toggleBanUser(id, Boolean(isBanned));
-      
+
       // Invalidate caches
-      await Promise.all([
-        redis.del(`user:${id}`),
-        redis.del('users:all')
-      ]);
-      
+      await Promise.all([redis.del(`user:${id}`), redis.del("users:all")]);
+
       res.json(user);
     } catch (error) {
       if (error instanceof Error) {
@@ -182,16 +175,16 @@ export class UserController {
   getAvailableAvatars = async (req: Request, res: Response) => {
     try {
       // Try to get from cache first
-      const cachedAvatars = await redis.get('avatars:all');
+      const cachedAvatars = await redis.get("avatars:all");
       if (cachedAvatars) {
         return res.json(JSON.parse(cachedAvatars));
       }
 
       const avatars = this.userService.getAvailableAvatars();
-      
+
       // Cache the avatars list
-      await redis.setex('avatars:all', this.CACHE_TTL, JSON.stringify(avatars));
-      
+      await redis.setex("avatars:all", this.CACHE_TTL, JSON.stringify(avatars));
+
       res.json(avatars);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch avatars" });
@@ -212,11 +205,13 @@ export class UserController {
         return res.json({ available: JSON.parse(cachedResult) });
       }
 
-      const available = await this.userService.checkUsernameAvailability(username);
-      
+      const available = await this.userService.checkUsernameAvailability(
+        username
+      );
+
       // Cache the result with a shorter TTL since this is more time-sensitive
       await redis.setex(`username:${username}`, 300, JSON.stringify(available));
-      
+
       res.json({ available });
     } catch (error) {
       res.status(500).json({ error: "Failed to check username availability" });
@@ -224,34 +219,137 @@ export class UserController {
   };
 
   getUserId = async (req: Request, res: Response) => {
-    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
     const userId = getUserId(ipAddress);
     console.log(ipAddress);
     res.json({ userId, ipAddress });
-  }
+  };
+
+  getUserByUsername = async (req: Request, res: Response) => {
+    try {
+      const { username } = req.params;
+
+      if (!username || typeof username !== "string") {
+        return res.status(400).json({ error: "Username is required" });
+      }
+
+      const data = await this.userService.getUserByUsername(username);
+
+      if (!data) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({
+        data: {
+          id: data.id,
+          username: data.username,
+          publicKey: data.publicKey,
+          walletAddress: data.walletAddress,
+          gender: data.gender,
+          avatarUrl: data.avatarUrl,
+          interests: data.interests,
+          isPro: data.isPro,
+          isBanned: data.isBanned,
+          createdAt: data.createdAt,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get user ID" });
+    }
+  };
+
+  searchUsers = async (req: Request, res: Response) => {
+    try {
+      const { query } = req.query;
+
+      if (!query || typeof query !== "string") {
+        return res.status(400).json({ error: "Search query is required" });
+      }
+
+      // Check Redis cache first
+      const cacheKey = `search:users:${query.toLowerCase()}`;
+      const cachedResult = await redis.get(cacheKey);
+
+      if (cachedResult) {
+        return res.json({ data: JSON.parse(cachedResult) });
+      }
+
+      // Search for users by username containing the query
+      const users = await this.userService.searchUsersByUsername(query);
+
+      // Format the response data
+      const formattedUsers = users.map(user => ({
+        id: user.id,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+        gender: user.gender,
+        isPro: user.isPro,
+      }));
+
+      // Cache the result for 5 minutes
+      await redis.setex(cacheKey, 300, JSON.stringify(formattedUsers));
+
+      res.json({ data: formattedUsers });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to search users" });
+    }
+  };
 
   verifyUserId = async (req: Request, res: Response) => {
     const { userId } = req.body;
     const isValid = verifyUserId(userId);
-    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
     res.json({ isValid, ipAddress });
-  }
+  };
 
   getPoints = async (req: Request, res: Response) => {
     const publicKey = req.user?.publicKey || "";
     const { startDate, endDate } = req.query;
-    const points = await this.userService.getPoints(publicKey, new Date(startDate as string), new Date(endDate as string));
+    const points = await this.userService.getPoints(
+      publicKey,
+      new Date(startDate as string),
+      new Date(endDate as string)
+    );
     res.json({ points });
-  }
+  };
 
   getUserPointsByDate = async (req: Request, res: Response) => {
     const publicKey = req.user?.publicKey || "";
     const points = await this.userService.getUserPointsByDate(publicKey);
     res.json({ points });
-  }
+  };
 
   getRankings = async (_: Request, res: Response) => {
     const data = await this.userService.getRankings();
     res.json({ data });
-  } 
+  };
+
+  getLuckyWinner = async (_: Request, res: Response) => {
+    try {
+      const cacheKey = "lucky_winner:latest";
+      
+      // Try to get from cache first
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return res.json({ data: JSON.parse(cached) });
+      }
+
+      const data = await prisma.luckyWinnerEntry.findFirst({
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      if (!data) {
+        return res.json({ data: null });
+      }
+
+      // Cache the result for 2 hours (7200 seconds)
+      await redis.setex(cacheKey, 7200, JSON.stringify(data));
+
+      res.json({ data });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get lucky winner" });
+    }
+  };
 }

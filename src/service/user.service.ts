@@ -70,6 +70,59 @@ export class UserService {
     }
   }
 
+  async getUserByUsername(username: string): Promise<User | null> {
+    try {
+      return await prisma.user.findUnique({
+        where: { username },
+        include: {
+          initiatedCalls: true,
+          receivedCalls: true,
+          sentTexts: true,
+          receivedTexts: true,
+          userFriendships: {
+            include: {
+              friend: true,
+            },
+          },
+          friendFriendships: {
+            include: {
+              user: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      throw new Error("Failed to fetch user by username");
+    }
+  }
+
+  async searchUsersByUsername(query: string): Promise<{id: string, username: string, avatarUrl: string | null, gender: Gender | null, isPro: boolean}[]> {
+    try {
+      return await prisma.user.findMany({
+        where: {
+          username: {
+            contains: query,
+            mode: 'insensitive',
+          },
+        },
+        select: {
+          id: true,
+          username: true,
+          avatarUrl: true,
+          gender: true,
+          isPro: true,
+        },
+        take: 20, // Limit results to 20 users
+        orderBy: {
+          username: 'asc',
+        },
+      });
+    } catch (error) {
+      console.error("Failed to search users by username", error);
+      return [];
+    }
+  }
+
   async getAllUsers(): Promise<User[]> {
     try {
       return await prisma.user.findMany({

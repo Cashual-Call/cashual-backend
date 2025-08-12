@@ -26,11 +26,14 @@ export class AvailableUserService {
     return { userOneJWT, userTwoJWT };
   }
 
-  async addUser(userId: string, interests: string[]) {
+  async addUser(userId: string, username = "",interests: string[]) {
     const pipeline = redis.pipeline();
 
     // Add user to main available users set
     pipeline.sadd(`users:${this.searchType}`, userId);
+    pipeline.hset(`user:${this.searchType}:${userId}`, "username", username);
+    // Add a timestamp for when the user was added
+    pipeline.hset(`user:${this.searchType}:${userId}`, "timestamp", Date.now().toString());
 
     // Add user to each interest-based set
     for (const interest of interests) {
@@ -63,6 +66,7 @@ export class AvailableUserService {
 
     // Remove user from main set
     pipeline.srem(`users:${this.searchType}`, userId);
+    pipeline.hdel(`user:${this.searchType}:${userId}`, "username");
 
     // Remove user from all interest sets
     for (const interest of interests) {
@@ -76,7 +80,7 @@ export class AvailableUserService {
   }
 
   async getAvailableUsers(): Promise<
-    { userId: string; interests: string[] }[]
+    { userId: string; interests: string[]; username: string }[]
   > {
     const userIds = await redis.smembers(`users:${this.searchType}`);
 
@@ -85,6 +89,7 @@ export class AvailableUserService {
     const pipeline = redis.pipeline();
     for (const userId of userIds) {
       pipeline.zrange(`user_interests:${this.searchType}:${userId}`, 0, -1);
+      pipeline.hget(`user:${this.searchType}:${userId}`, "username");
     }
 
     const results = await pipeline.exec();
@@ -92,7 +97,8 @@ export class AvailableUserService {
 
     return userIds.map((userId, index) => ({
       userId,
-      interests: (results[index][1] as string[]) || [],
+      interests: (results[index * 2][1] as string[]) || [],
+      username: (results[index * 2 + 1][1] as string) || "",
     }));
   }
 

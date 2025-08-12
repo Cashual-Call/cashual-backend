@@ -5,6 +5,8 @@ export const messageSchema = z.object({
   roomId: z.string(),
   senderId: z.string(),
   receiverId: z.string(),
+  senderUsername: z.string().optional(),
+  receiverUsername: z.string().optional(),
   username: z.string(),
   avatarUrl: z.string().optional(),
   timestamp: z.string(),

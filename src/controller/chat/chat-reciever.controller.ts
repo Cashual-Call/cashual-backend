@@ -130,7 +130,16 @@ export class ChatReceiverController {
     }
   }
 
-  async chatMessage(data: any) {
+  async chatMessage(
+    data: any,
+    chatData: {
+      senderUsername: string;
+      receiverUsername: string;
+      roomId: string;
+      senderId: string;
+      receiverId: string;
+    }
+  ) {
     try {
       const validatedData = sendMessageSchema.parse({
         ...data,
@@ -152,14 +161,18 @@ export class ChatReceiverController {
       // Create the complete message object
       const message: Message = {
         content: validatedData.content,
-        senderId: this.senderId,
-        receiverId: this.receiverId,
-        roomId: this.roomId,
-        username: this.senderId,
+        senderId: chatData.senderId,
+        receiverId: chatData.receiverId,
+        senderUsername: chatData.senderUsername,
+        receiverUsername: chatData.receiverUsername,
+        roomId: chatData.roomId,
+        username: chatData.senderUsername || chatData.senderId,
         type: validatedData.type,
         avatarUrl: "",
         timestamp: new Date().toISOString(),
       };
+
+      console.log("chatData", chatData);
 
       const messageObj =
         this.roomId !== "general"

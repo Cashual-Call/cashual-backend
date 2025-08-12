@@ -73,16 +73,25 @@ export default class RoomService {
   async createRoom(
     user1Id: string,
     user2Id: string,
-    isUser1Anonymous: boolean = true,
-    isUser2Anonymous: boolean = true
+    isUser1Anonymous: string = "",
+    isUser2Anonymous: string = ""
   ) {
+    console.log("createRoom", {
+      data: {
+        anonUser1Id: user1Id,
+        anonUser2Id: user2Id,
+        user1Id: isUser1Anonymous === "" ? null : isUser1Anonymous,
+        user2Id: isUser2Anonymous === "" ? null : isUser2Anonymous,
+        type: this.roomType as RoomType,
+      },
+    });
     try {
       const room = await prisma.room.create({
         data: {
           anonUser1Id: user1Id,
           anonUser2Id: user2Id,
-          user1Id: isUser1Anonymous ? null : user1Id,
-          user2Id: isUser2Anonymous ? null : user2Id,
+          user1Id: isUser1Anonymous === "" ? null : isUser1Anonymous,
+          user2Id: isUser2Anonymous === "" ? null : isUser2Anonymous,
           type: this.roomType as RoomType,
         },
       });

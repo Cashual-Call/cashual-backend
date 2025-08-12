@@ -82,6 +82,112 @@ export class NotificationController {
   };
 
   /**
+   * Save push subscription (alternative endpoint for frontend compatibility)
+   * POST /api/notifications/save-subscription
+   */
+  saveSubscription = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.user?.username;
+      const subscription: PushSubscriptionRequest = req.body; // Direct subscription object
+      const userAgent = req.get('User-Agent');
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          message: "Unauthorized",
+        });
+        return;
+      }
+
+      if (!subscription || !subscription.endpoint || !subscription.keys) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid subscription data",
+        });
+        return;
+      }
+
+      const pushSubscription = await this.notificationService.addPushSubscription(
+        userId,
+        subscription,
+        userAgent
+      );
+
+      res.status(201).json({
+        success: true,
+        message: "Successfully saved push subscription",
+        data: {
+          id: pushSubscription.id,
+          endpoint: pushSubscription.endpoint,
+          isActive: pushSubscription.isActive,
+          createdAt: pushSubscription.createdAt
+        },
+      });
+    } catch (error) {
+      logger.error("Error saving push subscription:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to save push subscription",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  };
+
+  /**
+   * Verify push subscription validity
+   * POST /api/notifications/verify-subscription
+   */
+  verifySubscription = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.user?.username;
+      const subscription: PushSubscriptionRequest = req.body;
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          message: "Unauthorized",
+        });
+        return;
+      }
+
+      if (!subscription || !subscription.endpoint) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid subscription data",
+        });
+        return;
+      }
+
+      // Check if subscription exists and is active
+      const isValid = await this.notificationService.verifyPushSubscription(
+        userId,
+        subscription.endpoint
+      );
+
+      if (isValid) {
+        res.status(200).json({
+          success: true,
+          message: "Subscription is valid",
+          data: { valid: true }
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: "Subscription not found or inactive",
+          data: { valid: false }
+        });
+      }
+    } catch (error) {
+      logger.error("Error verifying push subscription:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to verify push subscription",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  };
+
+  /**
    * Unsubscribe from push notifications
    * DELETE /api/notifications/unsubscribe
    */
@@ -128,7 +234,7 @@ export class NotificationController {
    */
   getNotifications = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const unreadOnly = req.query.unreadOnly === 'true';
@@ -141,7 +247,7 @@ export class NotificationController {
         });
         return;
       }
-
+      
       const result = await this.notificationService.getUserNotifications(userId, {
         page,
         limit,
@@ -336,7 +442,7 @@ export class NotificationController {
    */
   testPushNotification = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
 
       if (!userId) {
         res.status(401).json({
@@ -353,7 +459,7 @@ export class NotificationController {
 
       await this.notificationService.sendNotification(userId, testNotification, {
         sendPush: true,
-        saveToDb: false,
+        saveToDb: true,
       });
 
       res.status(200).json({

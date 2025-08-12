@@ -32,7 +32,7 @@ import { messageQueue, matchQueue } from "./lib/queue";
 const app = express();
 const httpServer = createServer(app);
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3001";
 
 const io = new Server(httpServer, {
   cors: {

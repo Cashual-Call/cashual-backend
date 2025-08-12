@@ -26,8 +26,13 @@ export class MatchService {
     this.roomStateService = new RoomStateService();
   }
 
-  async addUser(userId: string, interests: string[]) {
-    const user = await this.availableUserService.addUser(userId, interests);
+  async addUser(userId: string, username: string, interests: string[]) {
+    console.log("addUser", userId, username, interests);
+    const user = await this.availableUserService.addUser(
+      userId,
+      username,
+      interests
+    );
     return user;
   }
 
@@ -36,7 +41,7 @@ export class MatchService {
   }
 
   async getMatchedJWT(userId: string) {
-    const resp = await redis.hget(`match:${this.searchType}:${userId}`, 'data');
+    const resp = await redis.hget(`match:${this.searchType}:${userId}`, "data");
 
     if (resp) {
       const payload = JSON.parse(resp) as MatchPayload;
@@ -46,61 +51,83 @@ export class MatchService {
       return null;
     }
   }
-  
-  async setMatch(user1: string, user2: string) {
-    const room = await this.roomService.createRoom(user1, user2);
+
+  async setMatch(
+    user1: string,
+    user2: string,
+    user1Username: string = "",
+    user2Username: string = ""
+  ) {
+    const room = await this.roomService.createRoom(
+      user1,
+      user2,
+      user1Username,
+      user2Username
+    );
     const roomId = room.id;
-    
+
     // Initialize room state for heartbeat tracking
     const roomType = this.searchType as "chat" | "call";
-    const roomStateInitialized = await this.roomStateService.initializeRoomState(
-      roomId, 
-      roomType, 
-      user1, 
-      user2
-    );
-    
+    const roomStateInitialized =
+      await this.roomStateService.initializeRoomState(
+        roomId,
+        roomType,
+        user1,
+        user2
+      );
+
     if (!roomStateInitialized) {
       console.warn(`Failed to initialize room state for room ${roomId}`);
     }
-    
+
     const token1 = generateToken({
       senderId: user1,
       receiverId: user2,
       roomId,
+      senderUsername: user1Username,
+      receiverUsername: user2Username,
     });
-  
+
     const token2 = generateToken({
       senderId: user2,
       receiverId: user1,
       roomId,
+      senderUsername: user2Username,
+      receiverUsername: user1Username,
     });
-  
+
     await this.availableUserService.removeUser(user1);
     await this.availableUserService.removeUser(user2);
 
-  
     const pipeline = redis.pipeline();
-  
+
     // Store the match data as JSON string under 'data' field
-    pipeline.hset(`match:${this.searchType}:${user1}`, 'data', JSON.stringify({
-      userId: user2,
-      token: token1,
-      roomId,
-    }));
-  
-    pipeline.hset(`match:${this.searchType}:${user2}`, 'data', JSON.stringify({
-      userId: user1,
-      token: token2,
-      roomId,
-    }));
-  
+    pipeline.hset(
+      `match:${this.searchType}:${user1}`,
+      "data",
+      JSON.stringify({
+        userId: user2Username || user2,
+        token: token1,
+        roomId,
+      })
+    );
+
+    pipeline.hset(
+      `match:${this.searchType}:${user2}`,
+      "data",
+      JSON.stringify({
+        userId: user1Username || user1,
+        token: token2,
+        roomId,
+      })
+    );
+
     await pipeline.exec();
   }
 
   async bestMatch() {
     const availableUsers = await this.availableUserService.getAvailableUsers();
-    // console.log(`${this.searchType} availableUsers`, availableUsers);
+    console.log(`${this.searchType} availableUsers`, availableUsers);
 
     if (availableUsers.length < 2) {
       return;
@@ -148,8 +175,13 @@ export class MatchService {
       );
 
       // Find the best match among unmatched users
-      let bestMatch: { user1: string; user2: string; score: number } | null =
-        null;
+      let bestMatch: {
+        user1: string;
+        user2: string;
+        user1Username: string;
+        user2Username: string;
+        score: number;
+      } | null = null;
 
       for (let i = 0; i < unmatchedUsers.length; i++) {
         for (let j = i + 1; j < unmatchedUsers.length; j++) {
@@ -164,6 +196,8 @@ export class MatchService {
             bestMatch = {
               user1: user1.userId,
               user2: user2.userId,
+              user1Username: user1.username,
+              user2Username: user2.username,
               score,
             };
           }
@@ -172,7 +206,12 @@ export class MatchService {
 
       // If we found a match with common interests, use it
       if (bestMatch && bestMatch.score > 0) {
-        await this.setMatch(bestMatch.user1, bestMatch.user2);
+        await this.setMatch(
+          bestMatch.user1,
+          bestMatch.user2,
+          bestMatch.user1Username,
+          bestMatch.user2Username
+        );
         console.log(
           `Matched users ${bestMatch.user1} and ${bestMatch.user2} with ${bestMatch.score} common interests`
         );
@@ -192,7 +231,12 @@ export class MatchService {
 
         console.log(randomUser1, randomUser2);
 
-        await this.setMatch(randomUser1.userId, randomUser2.userId);
+        await this.setMatch(
+          randomUser1.userId,
+          randomUser2.userId,
+          randomUser1.username,
+          randomUser2.username
+        );
         console.log(
           `Randomly matched users ${randomUser1.userId} and ${randomUser2.userId} (no common interests found)`
         );

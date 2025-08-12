@@ -6,11 +6,10 @@ interface UserPoints {
   points: number;
 }
 
-interface UserPointsResponse {
-  userId: string;
-  points: number;
-  activities?: PointActivity[];
-  activityCount?: number;
+interface RankingData {
+  rank: number;
+  username: string;
+  score: number;
   avatar?: string;
 }
 
@@ -293,25 +292,67 @@ export class PointService {
   /**
    * Get all users' points for a specific date
    */
-  async getAllUserPointsByDate(date: Date, mock: boolean = true): Promise<UserPointsResponse[]> {
+  async getAllUserPointsByDate(date: Date, mock: boolean = true): Promise<RankingData[]> {
     if (mock) {
       return [
         {
-          userId: "mockUser1",
-          points: 120,
-          activityCount: 3,
+          username: "alice_crypto",
+          score: 1250,
+          rank: 1,
           avatar: "https://via.placeholder.com/150",
         },
         {
-          userId: "mockUser2",
-          points: 95,
-          activityCount: 2,
+          username: "bob_trader",
+          score: 980,
+          rank: 2,
           avatar: "https://via.placeholder.com/150",
         },
         {
-          userId: "mockUser3",
-          points: 60,
-          activityCount: 1,
+          username: "charlie_dev",
+          score: 760,
+          rank: 3,
+          avatar: "https://via.placeholder.com/150",
+        },
+        {
+          username: "diana_nft",
+          score: 540,
+          rank: 4,
+          avatar: "https://via.placeholder.com/150",
+        },
+        {
+          username: "evan_defi",
+          score: 420,
+          rank: 5,
+          avatar: "https://via.placeholder.com/150",
+        },
+        {
+          username: "fiona_web3",
+          score: 380,
+          rank: 6,
+          avatar: "https://via.placeholder.com/150",
+        },
+        {
+          username: "george_dao",
+          score: 320,
+          rank: 7,
+          avatar: "https://via.placeholder.com/150",
+        },
+        {
+          username: "helen_metaverse",
+          score: 280,
+          rank: 8,
+          avatar: "https://via.placeholder.com/150",
+        },
+        {
+          username: "ivan_gamefi",
+          score: 240,
+          rank: 9,
+          avatar: "https://via.placeholder.com/150",
+        },
+        {
+          username: "jane_blockchain",
+          score: 200,
+          rank: 10,
           avatar: "https://via.placeholder.com/150",
         },
       ];
@@ -349,9 +390,9 @@ export class PointService {
       const userMap = new Map(users.map(u => [u.id, u.avatarUrl]));
 
       return results.map((result) => ({
-        userId: result.userId,
-        points: result._sum.point || 0,
-        activityCount: result._count.id,
+        username: result.userId,
+        score: result._sum.point || 0,
+        rank: result._count.id,
         avatar: userMap.get(result.userId) || undefined,
       }));
     } catch (error) {

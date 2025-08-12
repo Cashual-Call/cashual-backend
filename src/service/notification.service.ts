@@ -3,6 +3,7 @@ import { redis } from "../lib/redis";
 import { sendWebPushNotification } from "../utils/notification";
 import { NotificationType, PushSubscription, Notification } from "@prisma/client";
 import logger from "../config/logger";
+import { UserService } from "./user.service";
 
 interface NotificationData {
   type: NotificationType;
@@ -32,6 +33,8 @@ export class NotificationService {
   private readonly USER_NOTIFICATIONS_PREFIX = "user_notifications:";
   private readonly UNREAD_COUNT_PREFIX = "unread_count:";
 
+  private userService: UserService;
+
   constructor() {
     this.sendNotification = this.sendNotification.bind(this);
     this.createNotification = this.createNotification.bind(this);
@@ -42,6 +45,8 @@ export class NotificationService {
     this.addPushSubscription = this.addPushSubscription.bind(this);
     this.removePushSubscription = this.removePushSubscription.bind(this);
     this.sendPushToUser = this.sendPushToUser.bind(this);
+
+    this.userService = new UserService();
   }
 
   /**
@@ -54,25 +59,37 @@ export class NotificationService {
   ): Promise<Notification | null> {
     const { sendPush = true, saveToDb = true } = options;
 
+    logger.info(`Starting notification send for user ${userId}`, {
+      type: notification.type,
+      title: notification.title,
+      sendPush,
+      saveToDb
+    });
+
     try {
       let dbNotification: Notification | null = null;
 
       // Save to database if requested
       if (saveToDb) {
+        logger.debug(`Saving notification to database for user ${userId}`);
         dbNotification = await this.createNotification({
           userId,
           notification,
           sendPush: false, // We'll handle push separately
           saveToDb: true
         });
+        logger.debug(`Notification saved to database with ID: ${dbNotification.id}`);
       }
 
       // Send push notification if requested
       if (sendPush) {
+        logger.debug(`Sending push notification to user ${userId}`);
         await this.sendPushToUser(userId, notification);
+        logger.debug(`Push notification sent successfully to user ${userId}`);
         
         // Update notification as sent if we saved it to DB
         if (dbNotification) {
+          logger.debug(`Updating notification ${dbNotification.id} as sent`);
           await prisma.notification.update({
             where: { id: dbNotification.id },
             data: { 
@@ -80,22 +97,33 @@ export class NotificationService {
               sentAt: new Date()
             }
           });
+          logger.debug(`Notification ${dbNotification.id} marked as sent`);
         }
       }
 
       // Invalidate cache
+      logger.debug(`Invalidating cache for user ${userId}`);
       await this.invalidateUserCache(userId);
+      logger.debug(`Cache invalidated for user ${userId}`);
 
-      logger.info(`Notification sent to user ${userId}`, {
+      logger.info(`Notification sent successfully to user ${userId}`, {
+        type: notification.type,
+        title: notification.title,
+        sendPush,
+        saveToDb,
+        notificationId: dbNotification?.id
+      });
+
+      return dbNotification;
+    } catch (error) {
+      logger.error(`Failed to send notification to user ${userId}:`, {
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
         type: notification.type,
         title: notification.title,
         sendPush,
         saveToDb
       });
-
-      return dbNotification;
-    } catch (error) {
-      logger.error(`Failed to send notification to user ${userId}:`, error);
       throw new Error(`Failed to send notification: ${error}`);
     }
   }
@@ -108,9 +136,7 @@ export class NotificationService {
 
     try {
       // Validate user exists
-      const user = await prisma.user.findUnique({
-        where: { id: userId }
-      });
+      const user = await this.userService.getUserByUsername(userId);
 
       if (!user) {
         throw new Error(`User with ID ${userId} not found`);
@@ -122,7 +148,7 @@ export class NotificationService {
         // Create notification in database
         dbNotification = await prisma.notification.create({
           data: {
-            userId,
+            userId: user.id,
             type: notification.type,
             title: notification.title,
             message: notification.message,
@@ -373,37 +399,86 @@ export class NotificationService {
    * Add push subscription for a user
    */
   async addPushSubscription(
-    userId: string,
+    username: string,
     subscription: PushSubscriptionData,
     userAgent?: string
   ): Promise<PushSubscription> {
     try {
-      // Deactivate existing subscription with same endpoint
-      await prisma.pushSubscription.updateMany({
+      // First verify that the user exists
+      const user = await this.userService.getUserByUsername(username);
+
+      if (!user) {
+        throw new Error(`User with ID ${username} not found`);
+      }
+
+      // Check if subscription already exists
+      const existingSubscription = await prisma.pushSubscription.findUnique({
         where: {
-          userId,
-          endpoint: subscription.endpoint
-        },
-        data: { isActive: false }
+          userId_endpoint: {
+            userId: username,
+            endpoint: subscription.endpoint
+          }
+        }
       });
 
-      // Create new subscription
-      const pushSubscription = await prisma.pushSubscription.create({
-        data: {
+      if (existingSubscription) {
+        // Update existing subscription
+        const pushSubscription = await prisma.pushSubscription.update({
+          where: {
+            userId_endpoint: {
+              userId: username,
+              endpoint: subscription.endpoint
+            }
+          },
+          data: {
+            p256dh: subscription.keys.p256dh,
+            auth: subscription.keys.auth,
+            userAgent: userAgent || null,
+            isActive: true
+          }
+        });
+
+        logger.info(`Push subscription updated for user ${username}`);
+        return pushSubscription;
+      } else {
+        // Create new subscription
+        const pushSubscription = await prisma.pushSubscription.create({
+          data: {
+            userId: username,
+            endpoint: subscription.endpoint,
+            p256dh: subscription.keys.p256dh,
+            auth: subscription.keys.auth,
+            userAgent: userAgent || null,
+            isActive: true
+          }
+        });
+
+        logger.info(`Push subscription added for user ${username}`);
+        return pushSubscription;
+      }
+    } catch (error) {
+      logger.error(`Failed to add push subscription:`, error);
+      throw new Error(`Failed to add push subscription: ${error}`);
+    }
+  }
+
+  /**
+   * Verify push subscription exists and is active
+   */
+  async verifyPushSubscription(userId: string, endpoint: string): Promise<boolean> {
+    try {
+      const subscription = await prisma.pushSubscription.findFirst({
+        where: {
           userId,
-          endpoint: subscription.endpoint,
-          p256dh: subscription.keys.p256dh,
-          auth: subscription.keys.auth,
-          userAgent: userAgent || null,
+          endpoint,
           isActive: true
         }
       });
 
-      logger.info(`Push subscription added for user ${userId}`);
-      return pushSubscription;
+      return subscription !== null;
     } catch (error) {
-      logger.error(`Failed to add push subscription:`, error);
-      throw new Error(`Failed to add push subscription: ${error}`);
+      logger.error(`Failed to verify push subscription:`, error);
+      return false;
     }
   }
 

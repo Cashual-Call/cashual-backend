@@ -61,12 +61,14 @@ export function setupChatHandlers(io: Server) {
   chatNamespace.on("connection", async (socket: Socket) => {
     const authToken = socket.handshake.auth.token;
 
-    const { roomId, senderId, receiverId } = authToken
+    const { roomId, senderId, receiverId, senderUsername = '', receiverUsername = '' } = authToken
       ? verifyToken(authToken)
       : {
           roomId: "general",
           senderId: socket.id, // TODO: chanage,
           receiverId: "global",
+          senderUsername: "",
+          receiverUsername: "",
         };
 
     const chatRecieverController = new ChatReceiverController(
@@ -86,7 +88,13 @@ export function setupChatHandlers(io: Server) {
 
     // Handle new messages
     socket.on(ChatEvent.MESSAGE, async (data: ChatMessage) =>
-      chatRecieverController.chatMessage(data)
+      chatRecieverController.chatMessage(data, {
+        senderUsername,
+        receiverUsername,
+        roomId,
+        senderId,
+        receiverId,
+      })
     );
 
     // Handle disconnection

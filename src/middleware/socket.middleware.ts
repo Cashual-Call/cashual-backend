@@ -10,6 +10,8 @@ interface SocketJWTPayload {
   roomId: string;
   senderId: string;
   receiverId: string;
+  senderUsername?: string;
+  receiverUsername?: string;
 }
 
 declare module "socket.io" {

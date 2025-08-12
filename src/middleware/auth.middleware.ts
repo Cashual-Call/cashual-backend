@@ -24,13 +24,19 @@ export const generateToken = (obj: UserJWTPayload): string => {
 export const verifyToken = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
+  safe = false
 ): void => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(' ')[1];
 
   if (!token) {
-    res.status(401).json({ message: 'No token provided' });
+    if (safe) {
+      console.log("Returning from verifyTokenSafe");
+      next();
+      return;
+    }
+    res.status(401).json({success: false, message: 'Unauthorized' });
     return;
   }
 
@@ -39,9 +45,18 @@ export const verifyToken = (
     req.user = decoded;
     next();
   } catch (error) {
+    if (safe) {
+      console.log("Returning from verifyTokenSafe");
+      next();
+      return;
+    }
     res.status(401).json({ message: 'Invalid token' });
     return;
   }
+};
+
+export const verifyTokenSafe = (req: Request, res: Response, next: NextFunction) => {
+  verifyToken(req, res, next, true);
 };
 
 export const verifyTokenForLogin = (
