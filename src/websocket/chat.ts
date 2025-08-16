@@ -1,5 +1,5 @@
 import { Server, Socket, Namespace } from "socket.io";
-import { subClient } from "../lib/redis";
+import { redis, subClient } from "../lib/redis";
 import { ChatReceiverController } from "../controller/chat/chat-reciever.controller";
 import { ChatEvent } from "../config/websocket";
 import { verifyToken } from "../middleware/socket.middleware";
@@ -70,6 +70,7 @@ export function setupChatHandlers(io: Server) {
           senderUsername: "",
           receiverUsername: "",
         };
+    redis.set(`chat:total-users`, io.engine.clientsCount);
 
     const chatRecieverController = new ChatReceiverController(
       socket,
@@ -98,7 +99,10 @@ export function setupChatHandlers(io: Server) {
     );
 
     // Handle disconnection
-    socket.on(ChatEvent.DISCONNECT, () => chatRecieverController.disconnect());
+    socket.on(ChatEvent.DISCONNECT, () => {
+      chatRecieverController.disconnect();
+      redis.set(`chat:total-users`, io.engine.clientsCount);
+    });
 
     // Handle user typing
     socket.on(ChatEvent.USER_TYPING, () => chatRecieverController.userTyping());

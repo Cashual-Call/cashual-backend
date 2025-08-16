@@ -91,15 +91,15 @@ model Text {
 
 model Friendship {
   id        String   @id @default(uuid())
-  userId    String
+  username    String
   friendId  String
   createdAt DateTime @default(now())
 
   // Relations
-  user   User @relation("user_friends", fields: [userId], references: [id])
+  user   User @relation("user_friends", fields: [username], references: [username])
   friend User @relation("friend_user", fields: [friendId], references: [id])
 
-  @@unique([userId, friendId])
+  @@unique([username, friendId])
 }
 
 model Report {

@@ -181,7 +181,7 @@ export class UserService {
         }),
         prisma.friendship.deleteMany({
           where: {
-            OR: [{ userId: id }, { friendId: id }],
+            OR: [{ username: id }, { friendId: id }],
           },
         }),
         prisma.report.deleteMany({

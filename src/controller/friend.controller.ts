@@ -47,7 +47,7 @@ export class FriendsController {
    */
   sendFriendRequest = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const { friendId } = req.params;
 
       if (!userId) {

@@ -9,7 +9,6 @@ import morgan from "morgan";
 import bodyParser from "body-parser";
 import session from "express-session";
 import "dotenv/config";
-import "./lib/redis";
 import authRouter from "./routes/auth.route";
 import { setupWebSocketHandlers } from "./websocket";
 import { pubClient, subClient } from "./lib/redis";
@@ -28,11 +27,12 @@ import { ExpressAdapter } from "@bull-board/express";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { messageQueue, matchQueue } from "./lib/queue";
+// import { name, version } from "../package.json";
 
 const app = express();
 const httpServer = createServer(app);
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3001";
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
 const io = new Server(httpServer, {
   cors: {
@@ -57,7 +57,7 @@ Promise.all([pubClient, subClient]).then(([pub, sub]) => {
 // Middleware
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: "*",
     credentials: true,
   })
 );
@@ -95,14 +95,18 @@ createBullBoard({
 app.use("/admin/queues", serverAdapter.getRouter());
 
 // Health check endpoint with detailed system metrics
-app.get("/health", (req, res) => {
+app.get("/health", async (req, res) => {
+  const chatTotalUsers = await pubClient.get(`chat:total-users`);
+  const callTotalUsers = await pubClient.get(`call:total-users`);
+  const totalUserCount = Number(chatTotalUsers) + Number(callTotalUsers);
+
   const uptime = process.uptime();
   const memoryUsage = process.memoryUsage();
   const cpuUsage = process.cpuUsage();
 
   res.status(200).json({
-    status: "ok",
     timestamp: new Date().toISOString(),
+    totalUserCount,
     uptime: {
       seconds: uptime,
       formatted: `${Math.floor(uptime / 3600)}h ${Math.floor(

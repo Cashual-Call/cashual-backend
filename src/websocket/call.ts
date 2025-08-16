@@ -192,6 +192,7 @@ export function setupCallHandlers(io: Server) {
 
   io.of("/call").on("connection", (socket: Socket) => {
     console.log("[Call] Socket connected:", socket.id);
+    redis.set(`call:total-users`, io.engine.clientsCount);
 
     // Add user to queue automatically
     userManager.addUser(socket);
@@ -199,6 +200,7 @@ export function setupCallHandlers(io: Server) {
     socket.on("disconnect", (reason) => {
       console.log("[Call] Socket disconnected:", socket.id, "Reason:", reason);
       userManager.removeUser(socket.id);
+      redis.set(`call:total-users`, io.engine.clientsCount);
     });
 
     // Handle WebRTC signaling with room-based forwarding
