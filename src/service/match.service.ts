@@ -144,6 +144,11 @@ export class MatchService {
         const user1 = availableUsers[i];
         const user2 = availableUsers[j];
 
+        // Skip matching users with the same username
+        if (user1.username === user2.username) {
+          continue;
+        }
+
         const commonInterests =
           await this.availableUserService.getCommonInterests(
             user1.userId,
@@ -188,9 +193,14 @@ export class MatchService {
           const user1 = unmatchedUsers[i];
           const user2 = unmatchedUsers[j];
 
+          // Skip matching users with the same username
+          if (user1.username === user2.username) {
+            continue;
+          }
+
           const commonInterests =
             commonInterestsMatrix[user1.userId][user2.userId];
-          const score = commonInterests.length;
+          const score = commonInterests ? commonInterests.length : 0;
 
           if (!bestMatch || score > bestMatch.score) {
             bestMatch = {
@@ -220,30 +230,47 @@ export class MatchService {
         matchedUsers.add(bestMatch.user1);
         matchedUsers.add(bestMatch.user2);
       } else {
-        // No good matches found, match randomly
-        const randomUser1 =
-          unmatchedUsers[Math.floor(Math.random() * unmatchedUsers.length)];
-        const remainingUsers = unmatchedUsers.filter(
-          (user) => user.userId !== randomUser1.userId
-        );
-        const randomUser2 =
-          remainingUsers[Math.floor(Math.random() * remainingUsers.length)];
+        // No good matches found, match randomly (but still avoid same username)
+        const eligibleUsers = unmatchedUsers.filter(user => {
+          return unmatchedUsers.some(otherUser => 
+            otherUser.userId !== user.userId && otherUser.username !== user.username
+          );
+        });
 
-        console.log(randomUser1, randomUser2);
+        if (eligibleUsers.length >= 2) {
+          const randomUser1 =
+            eligibleUsers[Math.floor(Math.random() * eligibleUsers.length)];
+          const remainingUsers = eligibleUsers.filter(
+            (user) => user.userId !== randomUser1.userId && user.username !== randomUser1.username
+          );
+          
+          if (remainingUsers.length > 0) {
+            const randomUser2 =
+              remainingUsers[Math.floor(Math.random() * remainingUsers.length)];
 
-        await this.setMatch(
-          randomUser1.userId,
-          randomUser2.userId,
-          randomUser1.username,
-          randomUser2.username
-        );
-        console.log(
-          `Randomly matched users ${randomUser1.userId} and ${randomUser2.userId} (no common interests found)`
-        );
+            console.log(randomUser1, randomUser2);
 
-        // Mark these users as matched
-        matchedUsers.add(randomUser1.userId);
-        matchedUsers.add(randomUser2.userId);
+            await this.setMatch(
+              randomUser1.userId,
+              randomUser2.userId,
+              randomUser1.username,
+              randomUser2.username
+            );
+            console.log(
+              `Randomly matched users ${randomUser1.userId} and ${randomUser2.userId} (no common interests found)`
+            );
+
+            // Mark these users as matched
+            matchedUsers.add(randomUser1.userId);
+            matchedUsers.add(randomUser2.userId);
+          } else {
+            // No eligible users to match randomly, break the loop
+            break;
+          }
+        } else {
+          // Not enough eligible users to match, break the loop
+          break;
+        }
       }
     }
 

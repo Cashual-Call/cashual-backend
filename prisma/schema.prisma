@@ -94,10 +94,11 @@ model Friendship {
   username    String
   friendId  String
   createdAt DateTime @default(now())
+  accepted  Boolean  @default(false)
 
   // Relations
   user   User @relation("user_friends", fields: [username], references: [username])
-  friend User @relation("friend_user", fields: [friendId], references: [id])
+  friend User @relation("friend_user", fields: [friendId], references: [username])
 
   @@unique([username, friendId])
 }

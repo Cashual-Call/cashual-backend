@@ -27,6 +27,20 @@ export class AvailableUserService {
   }
 
   async addUser(userId: string, username = "",interests: string[]) {
+    // Check if username already exists and remove old user if found
+    if (username) {
+      const existingUserIds = await redis.smembers(`users:${this.searchType}`);
+      
+      for (const existingUserId of existingUserIds) {
+        const existingUsername = await redis.hget(`user:${this.searchType}:${existingUserId}`, "username");
+        if (existingUsername === username && existingUserId !== userId) {
+          // Remove the old user with same username
+          await this.removeUser(existingUserId);
+          break;
+        }
+      }
+    }
+
     const pipeline = redis.pipeline();
 
     // Add user to main available users set

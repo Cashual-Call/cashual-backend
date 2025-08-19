@@ -1,4 +1,5 @@
 import { redis } from "../lib/redis";
+import { PointService } from "./point.service";
 
 interface IUser {
   id: string;
@@ -15,13 +16,39 @@ interface RoomState {
 }
 
 const HEARTBEAT_TIMEOUT = 10000;
+const CHAT_HEARTBEAT_POINTS = 1; // Points per heartbeat in chat rooms
+const CALL_HEARTBEAT_POINTS = 2; // Points per heartbeat in call rooms
+const HEARTBEATS_PER_POINT = 10; // How many heartbeats needed to earn a point
 
 export class RoomStateService {
+  private pointService: PointService;
+
   constructor() {
+    this.pointService = new PointService();
     this.heartbeat = this.heartbeat.bind(this);
     this.makeDisconnect = this.makeDisconnect.bind(this);
     this.removeDisconnectedUsers = this.removeDisconnectedUsers.bind(this);
     this.initializeRoomState = this.initializeRoomState.bind(this);
+    this.awardHeartbeatPoints = this.awardHeartbeatPoints.bind(this);
+  }
+
+  private async awardHeartbeatPoints(
+    userId: string,
+    heartbeatCount: number,
+    roomType: "chat" | "call"
+  ): Promise<void> {
+    // Award points every HEARTBEATS_PER_POINT heartbeats
+    if (heartbeatCount % HEARTBEATS_PER_POINT === 0) {
+      const pointsToAward = roomType === "call" ? CALL_HEARTBEAT_POINTS : CHAT_HEARTBEAT_POINTS;
+      const description = `Heartbeat activity in ${roomType} room (${heartbeatCount} heartbeats)`;
+      
+      try {
+        await this.pointService.addPoints(userId, pointsToAward, description);
+        console.log(`Awarded ${pointsToAward} points to user ${userId} for ${roomType} activity`);
+      } catch (error) {
+        console.error(`Failed to award heartbeat points to user ${userId}:`, error);
+      }
+    }
   }
 
   async heartbeat(
@@ -51,12 +78,18 @@ export class RoomStateService {
         heartbeatCount = roomState.user1.heartbeatCount;
         userState = roomState.user2;
         userUpdated = true;
+        
+        // Award points for heartbeat activity
+        await this.awardHeartbeatPoints(userId, heartbeatCount, roomState.roomType);
       } else if (roomState.user2.id === userId) {
         roomState.user2.lastHeartbeat = timenow;
         roomState.user2.heartbeatCount++;
         heartbeatCount = roomState.user2.heartbeatCount;
         userState = roomState.user2;
         userUpdated = true;
+        
+        // Award points for heartbeat activity
+        await this.awardHeartbeatPoints(userId, heartbeatCount, roomState.roomType);
       }
 
       if (!userUpdated) {

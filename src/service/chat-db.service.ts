@@ -85,14 +85,14 @@ export default class ChatDBService {
     }
     await redis.multi()
       .lpush(GLOBAL_MESSAGE_KEY, JSON.stringify(messageObj))
-      .ltrim(GLOBAL_MESSAGE_KEY, 0, 99)
+      .ltrim(GLOBAL_MESSAGE_KEY, 0, 999)
       .exec();
 
     return messageObj;
   }
 
   async getGlobalMessages() {
-    const messages = await redis.lrange(GLOBAL_MESSAGE_KEY, 0, 99);
+    const messages = await redis.lrange(GLOBAL_MESSAGE_KEY, 0, 999);
     return messages.map(message => JSON.parse(message));
   }
 }

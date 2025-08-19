@@ -16,9 +16,9 @@ export class FriendsService {
       const friendships = await prisma.friendship.findMany({
         where: {
           OR: [
-            { username: username },
-            { user: { id: username } }
-          ]
+            { username: username, accepted: true },
+            { user: { id: username }, accepted: true },
+          ],
         },
         include: {
           user: {
@@ -27,8 +27,8 @@ export class FriendsService {
               username: true,
               avatarUrl: true,
               isPro: true,
-              interests: true
-            }
+              interests: true,
+            },
           },
           friend: {
             select: {
@@ -36,22 +36,25 @@ export class FriendsService {
               username: true,
               avatarUrl: true,
               isPro: true,
-              interests: true
-            }
-          }
-        }
+              interests: true,
+            },
+          },
+        },
       });
 
       // Map to return the friend's data (not the current user's data)
-      const friends = friendships.map(friendship => {
-        const friend = friendship.username === username ? friendship.friend : friendship.user;
+      const friends = friendships.map((friendship) => {
+        const friend =
+          friendship.username === username
+            ? friendship.friend
+            : friendship.user;
         return {
           id: friend.id,
           username: friend.username,
           avatarUrl: friend.avatarUrl,
           isPro: friend.isPro,
           interests: friend.interests,
-          friendshipDate: friendship.createdAt
+          friendshipDate: friendship.createdAt,
         };
       });
 
@@ -69,19 +72,19 @@ export class FriendsService {
       // Check if users exist
       const [user, friend] = await Promise.all([
         prisma.user.findUnique({ where: { username: username } }),
-        prisma.user.findUnique({ where: { id: friendId } })
+        prisma.user.findUnique({ where: { username: friendId } }),
       ]);
 
       if (!user) {
-        throw new Error('User not found');
+        throw new Error("User not found");
       }
 
       if (!friend) {
-        throw new Error('Friend not found');
+        throw new Error("Friend not found");
       }
 
-      if (user.id === friendId) {
-        throw new Error('Cannot send friend request to yourself');
+      if (user.id === friend.id || user.username === friend.username) {
+        throw new Error("Cannot send friend request to yourself");
       }
 
       // Check if friendship already exists
@@ -89,20 +92,24 @@ export class FriendsService {
         where: {
           OR: [
             { username: username, friendId: friendId },
-            { username: friend.username, friendId: user.id }
-          ]
-        }
+            { username: friend.username, friendId: user.id },
+          ],
+        },
       });
 
       if (existingFriendship) {
-        throw new Error('Friendship already exists');
+        if (existingFriendship.accepted) {
+          throw new Error("Friendship already exists");
+        } else {
+          throw new Error("Friendship already Requested");
+        }
       }
 
       // Create friendship
       const friendship = await prisma.friendship.create({
         data: {
           username: username,
-          friendId: friendId
+          friendId: friendId,
         },
         include: {
           friend: {
@@ -111,10 +118,10 @@ export class FriendsService {
               username: true,
               avatarUrl: true,
               isPro: true,
-              interests: true
-            }
-          }
-        }
+              interests: true,
+            },
+          },
+        },
       });
 
       // Send notification to the friend about the new friend request
@@ -126,19 +133,27 @@ export class FriendsService {
         );
       } catch (notificationError) {
         // Log error but don't fail the friend request
-        console.error('Failed to send friend request notification:', notificationError);
+        console.error(
+          "Failed to send friend request notification:",
+          notificationError
+        );
       }
 
       // Send notification to the requester that the request was sent
       try {
         await this.notificationService.sendNotification(
           username,
-          NotificationService.NotificationTypes.FRIEND_ACCEPTED(friend.username),
+          NotificationService.NotificationTypes.FRIEND_ACCEPTED(
+            friend.username
+          ),
           { sendPush: true, saveToDb: true }
         );
       } catch (notificationError) {
         // Log error but don't fail the friend request
-        console.error('Failed to send friend accepted notification:', notificationError);
+        console.error(
+          "Failed to send friend accepted notification:",
+          notificationError
+        );
       }
 
       return {
@@ -147,7 +162,7 @@ export class FriendsService {
         avatarUrl: friendship.friend.avatarUrl,
         isPro: friendship.friend.isPro,
         interests: friendship.friend.interests,
-        friendshipDate: friendship.createdAt
+        friendshipDate: friendship.createdAt,
       };
     } catch (error) {
       throw new Error(`Failed to send friend request: ${error}`);
@@ -160,36 +175,48 @@ export class FriendsService {
   async removeFriend(username: string, friendId: string) {
     try {
       // Get user by username to get their ID
-      const user = await prisma.user.findUnique({ 
+      const user = await prisma.user.findUnique({
         where: { username: username },
-        select: { id: true, username: true }
+        select: { id: true, username: true },
       });
 
       if (!user) {
-        throw new Error('User not found');
+        throw new Error("User not found");
       }
 
       const friendship = await prisma.friendship.findFirst({
         where: {
           OR: [
             { username: username, friendId: friendId },
-            { username: { in: [await prisma.user.findUnique({ where: { id: friendId }, select: { username: true } }).then(f => f?.username || "")] }, friendId: user.id }
-          ]
-        }
+            {
+              username: {
+                in: [
+                  await prisma.user
+                    .findUnique({
+                      where: { id: friendId },
+                      select: { username: true },
+                    })
+                    .then((f) => f?.username || ""),
+                ],
+              },
+              friendId: user.id,
+            },
+          ],
+        },
       });
 
       if (!friendship) {
-        throw new Error('Friendship not found');
+        throw new Error("Friendship not found");
       }
 
       // Get friend details for notification
-      const friend = await prisma.user.findUnique({ 
+      const friend = await prisma.user.findUnique({
         where: { id: friendId },
-        select: { username: true }
+        select: { username: true },
       });
 
       await prisma.friendship.delete({
-        where: { id: friendship.id }
+        where: { id: friendship.id },
       });
 
       // Send notification to the friend that they were removed
@@ -205,11 +232,14 @@ export class FriendsService {
           );
         } catch (notificationError) {
           // Log error but don't fail the removal
-          console.error('Failed to send friend removal notification:', notificationError);
+          console.error(
+            "Failed to send friend removal notification:",
+            notificationError
+          );
         }
       }
 
-      return { message: 'Friend removed successfully' };
+      return { message: "Friend removed successfully" };
     } catch (error) {
       throw new Error(`Failed to remove friend: ${error}`);
     }
@@ -221,9 +251,9 @@ export class FriendsService {
   async areFriends(username: string, friendId: string): Promise<boolean> {
     try {
       // Get user by username to get their ID
-      const user = await prisma.user.findUnique({ 
+      const user = await prisma.user.findUnique({
         where: { username: username },
-        select: { id: true }
+        select: { id: true },
       });
 
       if (!user) {
@@ -234,9 +264,21 @@ export class FriendsService {
         where: {
           OR: [
             { username: username, friendId: friendId },
-            { username: { in: [await prisma.user.findUnique({ where: { id: friendId }, select: { username: true } }).then(f => f?.username || "")] }, friendId: user.id }
-          ]
-        }
+            {
+              username: {
+                in: [
+                  await prisma.user
+                    .findUnique({
+                      where: { id: friendId },
+                      select: { username: true },
+                    })
+                    .then((f) => f?.username || ""),
+                ],
+              },
+              friendId: user.id,
+            },
+          ],
+        },
       });
 
       return !!friendship;
@@ -251,30 +293,27 @@ export class FriendsService {
   async getFriendSuggestions(username: string, limit: number = 10) {
     try {
       // Get user by username to get their ID
-      const user = await prisma.user.findUnique({ 
+      const user = await prisma.user.findUnique({
         where: { username: username },
-        select: { id: true }
+        select: { id: true },
       });
 
       if (!user) {
-        throw new Error('User not found');
+        throw new Error("User not found");
       }
 
       // Get current friend IDs
       const friendships = await prisma.friendship.findMany({
         where: {
-          OR: [
-            { username: username },
-            { friendId: user.id }
-          ]
+          OR: [{ username: username }, { friendId: user.id }],
         },
         select: {
           username: true,
-          friendId: true
-        }
+          friendId: true,
+        },
       });
 
-      const friendIds = friendships.map(f => 
+      const friendIds = friendships.map((f) =>
         f.username === username ? f.friendId : user.id
       );
 
@@ -284,20 +323,20 @@ export class FriendsService {
           AND: [
             { id: { not: user.id } },
             { id: { notIn: friendIds } },
-            { isBanned: false }
-          ]
+            { isBanned: false },
+          ],
         },
         select: {
           id: true,
           username: true,
           avatarUrl: true,
           isPro: true,
-          interests: true
+          interests: true,
         },
         take: limit,
         orderBy: {
-          createdAt: 'desc'
-        }
+          createdAt: "desc",
+        },
       });
 
       return suggestions;
@@ -307,39 +346,110 @@ export class FriendsService {
   }
 
   /**
+   * Get pending friend requests for a user
+   */
+  async getPendingRequests(username: string) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { username: username },
+      });
+
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Get pending requests where user is the recipient (friendId)
+      const pendingRequests = await prisma.friendship.findMany({
+        where: {
+          friendId: user.id,
+          accepted: false,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+              isPro: true,
+              interests: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      // Map to return the requester's data
+      const requests = pendingRequests.map((request) => ({
+        id: request.id,
+        requester: {
+          id: request.user.id,
+          username: request.user.username,
+          avatarUrl: request.user.avatarUrl,
+          isPro: request.user.isPro,
+          interests: request.user.interests,
+        },
+        requestDate: request.createdAt,
+      }));
+
+      return requests;
+    } catch (error) {
+      throw new Error(`Failed to get pending requests: ${error}`);
+    }
+  }
+
+  /**
    * Accept a pending friend request (if you want to add this functionality)
    */
-  async acceptFriendRequest(username: string, requesterId: string) {
+  async acceptFriendRequest(friendshipId: string) {
     try {
-      // Get user details for notification
-      const [user, requester] = await Promise.all([
-        prisma.user.findUnique({ 
-          where: { username: username },
-          select: { username: true }
-        }),
-        prisma.user.findUnique({ 
-          where: { id: requesterId },
-          select: { username: true }
-        })
-      ]);
+      const friendship = await prisma.friendship.findUnique({
+        where: { id: friendshipId },
+        include: {
+          user: {
+            select: {
+              username: true,
+            },
+          },
+          friend: {
+            select: {
+              username: true,
+            },
+          },
+        },
+      });
 
-      if (!user || !requester) {
-        throw new Error('User not found');
+      if (!friendship) {
+        throw new Error("Friendship not found");
+      }
+
+      if (friendship.accepted) {
+        throw new Error("Friendship already accepted");
       }
 
       // Send notification to the requester that their request was accepted
       try {
+        await prisma.friendship.update({
+          where: { id: friendship.id },
+          data: { accepted: true },
+        });
         await this.notificationService.sendNotification(
-          requester.username,
-          NotificationService.NotificationTypes.FRIEND_ACCEPTED(user.username),
+          friendship.user.username,
+          NotificationService.NotificationTypes.FRIEND_ACCEPTED(
+            friendship.friend.username
+          ),
           { sendPush: true, saveToDb: true }
         );
       } catch (notificationError) {
         // Log error but don't fail the acceptance
-        console.error('Failed to send friend accepted notification:', notificationError);
+        console.error(
+          "Failed to send friend accepted notification:",
+          notificationError
+        );
       }
 
-      return { message: 'Friend request accepted successfully' };
+      return { message: "Friend request accepted successfully" };
     } catch (error) {
       throw new Error(`Failed to accept friend request: ${error}`);
     }
