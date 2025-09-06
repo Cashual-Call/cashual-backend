@@ -15,10 +15,12 @@ router.use(verifyTokenSafe);
 
 router.post("/call/start-search/:userId", callSearchController.startSearch as RequestHandler);
 router.post("/call/stop-search/:userId", callSearchController.stopSearch as RequestHandler);
+router.post("/call/heartbeat/:userId", callSearchController.heartbeat as RequestHandler);
 router.get("/call/:userId", callSearchController.getMatch as RequestHandler);
 
 router.post("/chat/start-search/:userId", chatSearchController.startSearch as RequestHandler);
 router.post("/chat/stop-search/:userId", chatSearchController.stopSearch as RequestHandler);
+router.post("/chat/heartbeat/:userId", chatSearchController.heartbeat as RequestHandler);
 router.get("/chat/:userId", chatSearchController.getMatch as RequestHandler);
 
 router.get("/", userController.searchUsers as RequestHandler);

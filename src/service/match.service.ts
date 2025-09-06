@@ -40,6 +40,14 @@ export class MatchService {
     await this.availableUserService.removeUser(userId);
   }
 
+  async updateUserHeartbeat(userId: string) {
+    await this.availableUserService.updateUserHeartbeat(userId);
+  }
+
+  async cleanupInactiveUsers(timeoutMs?: number) {
+    return await this.availableUserService.cleanupInactiveUsers(timeoutMs);
+  }
+
   async getMatchedJWT(userId: string) {
     const resp = await redis.hget(`match:${this.searchType}:${userId}`, "data");
 

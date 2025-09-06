@@ -22,6 +22,16 @@ const processMatchJob = async () => {
     const lock = await redlock.acquire([lockKey], lockTtl);
     try {
       logger.info("[MatchCron] Running match job at", new Date().toISOString());
+      
+      // Clean up inactive users first (users inactive for more than 30 seconds)
+      const chatInactiveCount = await matchServiceChat.cleanupInactiveUsers(30000);
+      const callInactiveCount = await matchServiceCall.cleanupInactiveUsers(30000);
+      
+      if (chatInactiveCount > 0 || callInactiveCount > 0) {
+        logger.info(`[MatchCron] Cleaned up inactive users - Chat: ${chatInactiveCount}, Call: ${callInactiveCount}`);
+      }
+      
+      // Then perform matching
       await matchServiceChat.bestMatch();
       await matchServiceCall.bestMatch();
       logger.info("[MatchCron] Match job processed successfully");

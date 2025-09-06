@@ -11,6 +11,7 @@ export class SearchController {
     this.startSearch = this.startSearch.bind(this);
     this.stopSearch = this.stopSearch.bind(this);
     this.getMatch = this.getMatch.bind(this);
+    this.heartbeat = this.heartbeat.bind(this);
   }
 
   async startSearch(req: Request, res: Response) {
@@ -59,6 +60,25 @@ export class SearchController {
     }
 
     res.status(200).json({ data: match, message: "Match found" });
+    return;
+  }
+
+  async heartbeat(req: Request, res: Response) {
+    const { userId } = req.params;
+
+    if (!userId) {
+      throw new Error("User ID is required");
+    }
+
+    const user = await verifyUserId(userId);
+
+    if (!user) {
+      throw new Error("User is Not Validated");
+    }
+
+    await this.matchService.updateUserHeartbeat(userId);
+
+    res.status(200).json({ message: "Heartbeat updated" });
     return;
   }
 }

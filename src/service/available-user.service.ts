@@ -93,6 +93,37 @@ export class AvailableUserService {
     await pipeline.exec();
   }
 
+  async updateUserHeartbeat(userId: string) {
+    // Update the user's last heartbeat timestamp
+    await redis.hset(`user:${this.searchType}:${userId}`, "lastHeartbeat", Date.now().toString());
+  }
+
+  async cleanupInactiveUsers(timeoutMs: number = 30000) { // 30 seconds timeout
+    const currentTime = Date.now();
+    const availableUserIds = await redis.smembers(`users:${this.searchType}`);
+    const inactiveUsers: string[] = [];
+
+    for (const userId of availableUserIds) {
+      const lastHeartbeat = await redis.hget(`user:${this.searchType}:${userId}`, "lastHeartbeat");
+      const timestamp = await redis.hget(`user:${this.searchType}:${userId}`, "timestamp");
+      
+      // Use lastHeartbeat if available, otherwise fall back to timestamp
+      const lastActivity = lastHeartbeat ? parseInt(lastHeartbeat) : (timestamp ? parseInt(timestamp) : 0);
+      
+      if (currentTime - lastActivity > timeoutMs) {
+        inactiveUsers.push(userId);
+      }
+    }
+
+    // Remove inactive users
+    for (const userId of inactiveUsers) {
+      console.log(`[${this.searchType}] Removing inactive user: ${userId}`);
+      await this.removeUser(userId);
+    }
+
+    return inactiveUsers.length;
+  }
+
   async getAvailableUsers(): Promise<
     { userId: string; interests: string[]; username: string }[]
   > {
