@@ -5,9 +5,9 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { CallEvent } from "../config/websocket";
 import { verifyToken } from "../middleware/socket.middleware";
 
-enum CallEvents {
-  MUTE_USER = "mute-user",
-  UNMUTE_USER = "unmute-user",
+// Extend global interface to include io property
+declare global {
+  var io: Server | undefined;
 }
 
 enum SocketEvents {
@@ -27,137 +27,170 @@ interface CallRoom {
 }
 interface CallUser {
   socketId: string;
-  socket: Socket;
   joinedAt: Date;
 }
 
 class CallUserManager {
-  private users: Map<string, CallUser> = new Map();
-  private queue: string[] = [];
-  private rooms: Map<string, CallRoom> = new Map();
-  private userRooms: Map<string, string> = new Map(); // socketId -> roomId
   private roomCounter = 1;
 
-  addUser(socket: Socket) {
+  async addUser(socket: Socket, roomId: string) {
     const user: CallUser = {
       socketId: socket.id,
-      socket,
       joinedAt: new Date(),
     };
 
-    this.users.set(socket.id, user);
-    this.queue.push(socket.id);
+    // Store user data in Redis
+    await redis.hset(`call:user:${socket.id}`, {
+      socketId: socket.id,
+      joinedAt: user.joinedAt.toISOString(),
+    });
 
+    // Add to queue
+    await redis.lpush("call:queue", socket.id);
+
+    const queueLength = await redis.llen("call:queue");
     console.log(
-      `[Call] User ${socket.id} added to queue. Queue length: ${this.queue.length}`
+      `[Call] User ${socket.id} added to queue. Queue length: ${queueLength}`
     );
 
     // Emit lobby event to let user know they're waiting
     socket.emit(SocketEvents.LOBBY);
 
     // Try to match users
-    this.tryMatchUsers();
+    await this.tryMatchUsers(roomId);
   }
 
-  removeUser(socketId: string) {
+  async removeUser(socketId: string) {
     // Clean up room if user was in one
-    const roomId = this.userRooms.get(socketId);
+    const roomId = await redis.get(`call:user-room:${socketId}`);
     if (roomId) {
-      this.handleUserLeaveRoom(roomId, socketId);
+      await this.handleUserLeaveRoom(roomId, socketId);
     }
 
     // Remove from queue and users
-    this.queue = this.queue.filter((id) => id !== socketId);
-    this.users.delete(socketId);
-    this.userRooms.delete(socketId);
+    await redis.lrem("call:queue", 0, socketId);
+    await redis.del(`call:user:${socketId}`);
+    await redis.del(`call:user-room:${socketId}`);
 
+    const remainingUsers = await redis.hlen("call:users");
     console.log(
-      `[Call] User ${socketId} removed. Remaining users: ${this.users.size}`
+      `[Call] User ${socketId} removed. Remaining users: ${remainingUsers}`
     );
   }
 
-  private tryMatchUsers() {
-    if (this.queue.length < 2) {
+  private async tryMatchUsers(roomId: string) {
+    const queueLength = await redis.llen("call:queue");
+    if (queueLength < 2) {
       return;
     }
 
-    const user1Id = this.queue.shift()!;
-    const user2Id = this.queue.shift()!;
+    const user1Id = await redis.rpop("call:queue");
+    const user2Id = await redis.rpop("call:queue");
 
-    const user1 = this.users.get(user1Id);
-    const user2 = this.users.get(user2Id);
-
-    if (!user1 || !user2) {
+    if (!user1Id || !user2Id) {
       console.log(`[Call] Failed to match users - one or both users not found`);
       return;
     }
 
-    this.createRoom(user1, user2);
+    const user1Exists = await redis.exists(`call:user:${user1Id}`);
+    const user2Exists = await redis.exists(`call:user:${user2Id}`);
+
+    if (!user1Exists || !user2Exists) {
+      console.log(`[Call] Failed to match users - one or both users not found`);
+      return;
+    }
+
+    await this.createRoom(user1Id, user2Id, roomId);
   }
 
-  private createRoom(user1: CallUser, user2: CallUser) {
-    const roomId = `room_${this.roomCounter++}`;
-
+  private async createRoom(user1Id: string, user2Id: string, roomId: string) {
     const room: CallRoom = {
       id: roomId,
-      participants: [user1.socketId, user2.socketId],
+      participants: [user1Id, user2Id],
       status: "active",
       startTime: new Date(),
     };
 
-    this.rooms.set(roomId, room);
-    this.userRooms.set(user1.socketId, roomId);
-    this.userRooms.set(user2.socketId, roomId);
+    // Store room data in Redis
+    await redis.hset(`call:room:${roomId}`, {
+      id: roomId,
+      participants: JSON.stringify(room.participants),
+      status: room.status,
+      startTime: room.startTime.toISOString(),
+    });
+
+    const a = await redis.hgetall(`call:room:${roomId}`);
+    console.log("fuewhfuiew", a);
+
+    // Map users to room
+    await redis.set(`call:user-room:${user1Id}`, roomId);
+    await redis.set(`call:user-room:${user2Id}`, roomId);
 
     console.log(
-      `[Call] Created room ${roomId} for users ${user1.socketId} and ${user2.socketId}`
+      `[Call] Created room ${roomId} for users ${user1Id} and ${user2Id}`
     );
 
-    // Emit send-offer to user1 (initiator)
-    user1.socket.emit(SocketEvents.SEND_OFFER, { roomId });
+    // Get socket instances from the namespace
+    const namespace = global.io?.of("/call");
+    if (!namespace) return;
 
-    // User2 will wait for the offer
-    user2.socket.emit(SocketEvents.LOBBY, { roomId, waiting: true });
+    const user1Socket = namespace.sockets.get(user1Id);
+    const user2Socket = namespace.sockets.get(user2Id);
+
+    if (user1Socket && user2Socket) {
+      // Emit send-offer to user1 (initiator)
+      user1Socket.emit(SocketEvents.SEND_OFFER, { roomId });
+
+      // User2 will wait for the offer
+      user2Socket.emit(SocketEvents.LOBBY, { roomId, waiting: true });
+    }
   }
 
-  private handleUserLeaveRoom(roomId: string, socketId: string) {
-    const room = this.rooms.get(roomId);
-    if (!room) return;
+  private async handleUserLeaveRoom(roomId: string, socketId: string) {
+    const roomData = await redis.hgetall(`call:room:${roomId}`);
+    if (!roomData.participants) return;
+
+    const participants = JSON.parse(roomData.participants);
 
     // Find the other user in the room
-    const otherUserId = room.participants.find((id) => id !== socketId);
+    const otherUserId = participants.find((id: string) => id !== socketId);
     if (otherUserId) {
-      const otherUser = this.users.get(otherUserId);
-      if (otherUser) {
+      const namespace = global.io?.of("/call");
+      const otherUserSocket = namespace?.sockets.get(otherUserId);
+
+      if (otherUserSocket) {
         // Put the other user back in lobby
-        otherUser.socket.emit(SocketEvents.LOBBY);
-        this.queue.push(otherUserId);
-        this.userRooms.delete(otherUserId);
+        otherUserSocket.emit(SocketEvents.LOBBY);
+        await redis.lpush("call:queue", otherUserId);
+        await redis.del(`call:user-room:${otherUserId}`);
       }
     }
 
     // Clean up room
-    this.rooms.delete(roomId);
-    this.userRooms.delete(socketId);
+    await redis.del(`call:room:${roomId}`);
+    await redis.del(`call:user-room:${socketId}`);
 
     console.log(`[Call] Room ${roomId} cleaned up after user ${socketId} left`);
   }
 
-  forwardToRoom(
+  async forwardToRoom(
     roomId: string,
     senderSocketId: string,
     event: string,
     data: any
   ) {
-    const room = this.rooms.get(roomId);
-    if (!room) {
+    const roomData = await redis.hgetall(`call:room:${roomId}`);
+    if (!roomData.participants) {
       console.log(`[Call] Room ${roomId} not found for event ${event}`);
+      const a = await redis.hgetall(`call:room`);
       return;
     }
 
+    const participants = JSON.parse(roomData.participants);
+
     // Find the other user in the room
-    const receiverSocketId = room.participants.find(
-      (id) => id !== senderSocketId
+    const receiverSocketId = participants.find(
+      (id: string) => id !== senderSocketId
     );
     if (!receiverSocketId) {
       console.log(
@@ -166,16 +199,18 @@ class CallUserManager {
       return;
     }
 
-    const receiverUser = this.users.get(receiverSocketId);
-    if (!receiverUser) {
+    const namespace = global.io?.of("/call");
+    const receiverSocket = namespace?.sockets.get(receiverSocketId);
+
+    if (!receiverSocket) {
       console.log(
-        `[Call] Receiver user ${receiverSocketId} not found for event ${event}`
+        `[Call] Receiver socket ${receiverSocketId} not found for event ${event}`
       );
       return;
     }
 
     // Forward the event to the other user
-    receiverUser.socket.emit(event, { ...data, roomId });
+    receiverSocket.emit(event, { ...data, roomId });
     console.log(
       `[Call] Forwarded ${event} from ${senderSocketId} to ${receiverSocketId} in room ${roomId}`
     );
@@ -188,70 +223,134 @@ function validateRoomId(roomId: string): boolean {
 }
 
 export function setupCallHandlers(io: Server) {
+  // Store io instance globally for access in CallUserManager
+  (global as any).io = io;
+
   const userManager = new CallUserManager();
 
   io.of("/call").on("connection", (socket: Socket) => {
-    console.log("[Call] Socket connected:", socket.id);
+    // console.log("[Call] Socket connected:", socket.id);
+    const authToken = socket.handshake.auth.token;
+    const {
+      roomId,
+      senderId,
+      receiverId,
+      senderUsername = "",
+      receiverUsername = "",
+    } = authToken
+      ? verifyToken(authToken)
+      : {
+          roomId: "general",
+          senderId: socket.id, // TODO: chanage,
+          receiverId: "global",
+          senderUsername: "",
+          receiverUsername: "",
+        };
+
+        console.log("roomIduhewrige", roomId);
+
     redis.set(`call:total-users`, io.engine.clientsCount);
 
     // Add user to queue automatically
-    userManager.addUser(socket);
+    userManager.addUser(socket, roomId);
 
-    socket.on("disconnect", (reason) => {
+    socket.on("disconnect", async (reason) => {
       console.log("[Call] Socket disconnected:", socket.id, "Reason:", reason);
-      userManager.removeUser(socket.id);
+      await userManager.removeUser(socket.id);
       redis.set(`call:total-users`, io.engine.clientsCount);
     });
 
     // Handle WebRTC signaling with room-based forwarding
-    socket.on(SocketEvents.OFFER, (data: { sdp: any; roomId: string }) => {
-      userManager.forwardToRoom(data.roomId, socket.id, SocketEvents.OFFER, {
-        sdp: data.sdp,
-      });
-    });
+    socket.on(
+      SocketEvents.OFFER,
+      async (data: { sdp: any; roomId: string }) => {
+        await userManager.forwardToRoom(
+          data.roomId,
+          socket.id,
+          SocketEvents.OFFER,
+          {
+            sdp: data.sdp,
+          }
+        );
+      }
+    );
 
-    socket.on(SocketEvents.ANSWER, (data: { sdp: any; roomId: string }) => {
-      userManager.forwardToRoom(data.roomId, socket.id, SocketEvents.ANSWER, {
-        sdp: data.sdp,
-      });
-    });
+    socket.on(
+      SocketEvents.ANSWER,
+      async (data: { sdp: any; roomId: string }) => {
+        await userManager.forwardToRoom(
+          data.roomId,
+          socket.id,
+          SocketEvents.ANSWER,
+          {
+            sdp: data.sdp,
+          }
+        );
+      }
+    );
 
-    socket.on(SocketEvents.SEND_OFFER, (data: { roomId: string }) => {
-      userManager.forwardToRoom(data.roomId, socket.id, SocketEvents.SEND_OFFER, {
-        roomId: data.roomId,
-      });
-    });
-
-    socket.on(SocketEvents.LOBBY, (data: { roomId: string }) => {
-      userManager.forwardToRoom(data.roomId, socket.id, SocketEvents.LOBBY, {
-        roomId: data.roomId,
-      });
-    });
-
-    socket.on(SocketEvents.ADD_ICE_CANDIDATE, (data: { candidate: any; type: string; roomId: string }) => {
-      userManager.forwardToRoom(data.roomId, socket.id, SocketEvents.ADD_ICE_CANDIDATE, {
-        candidate: data.candidate,
-        type: data.type,
-      });
-    });
-
-    socket.on(SocketEvents.USER_EVENT, (data: { event: string; roomId: string }) => {
-      console.log(
-        `[Call] Received user event from ${socket.id} for room ${data.roomId}`
+    socket.on(SocketEvents.SEND_OFFER, async (data: { roomId: string }) => {
+      await userManager.forwardToRoom(
+        data.roomId,
+        socket.id,
+        SocketEvents.SEND_OFFER,
+        {
+          roomId: data.roomId,
+        }
       );
-      userManager.forwardToRoom(data.roomId, socket.id, SocketEvents.USER_EVENT, {
-        event: data.event,
-        roomId: data.roomId,
-      });
+    });
+
+    socket.on(SocketEvents.LOBBY, async (data: { roomId: string }) => {
+      await userManager.forwardToRoom(
+        data.roomId,
+        socket.id,
+        SocketEvents.LOBBY,
+        {
+          roomId: data.roomId,
+        }
+      );
     });
 
     socket.on(
       SocketEvents.ADD_ICE_CANDIDATE,
-      (data: { candidate: any; type: string; roomId: string }) => {
+      async (data: { candidate: any; type: string; roomId: string }) => {
+        await userManager.forwardToRoom(
+          data.roomId,
+          socket.id,
+          SocketEvents.ADD_ICE_CANDIDATE,
+          {
+            candidate: data.candidate,
+            type: data.type,
+          }
+        );
+      }
+    );
+
+    socket.on(
+      SocketEvents.USER_EVENT,
+      async (data: { eventType: string; roomId: string }) => {
+        console.log(
+          `[Call] Received user event from ${socket.id} for room ${data.roomId}: ${data.eventType}`
+        );
+        await userManager.forwardToRoom(
+          data.roomId,
+          socket.id,
+          SocketEvents.USER_EVENT,
+          {
+            eventType: data.eventType,
+            roomId: data.roomId,
+          }
+        );
+      }
+    );
+
+    socket.on(
+      SocketEvents.ADD_ICE_CANDIDATE,
+      async (data: { candidate: any; type: string; roomId: string }) => {
         console.log(
           `[Call] Received ICE candidate from ${socket.id} for room ${data.roomId}`
         );
-        userManager.forwardToRoom(
+        await userManager.forwardToRoom(
           data.roomId,
           socket.id,
           SocketEvents.ADD_ICE_CANDIDATE,

@@ -163,6 +163,7 @@ export class FriendsService {
         isPro: friendship.friend.isPro,
         interests: friendship.friend.interests,
         friendshipDate: friendship.createdAt,
+        friendshipId: friendship.id, // Add the friendship ID for notifications
       };
     } catch (error) {
       throw new Error(`Failed to send friend request: ${error}`);
@@ -452,6 +453,46 @@ export class FriendsService {
       return { message: "Friend request accepted successfully" };
     } catch (error) {
       throw new Error(`Failed to accept friend request: ${error}`);
+    }
+  }
+
+  /**
+   * Reject a pending friend request
+   */
+  async rejectFriendRequest(friendshipId: string) {
+    try {
+      const friendship = await prisma.friendship.findUnique({
+        where: { id: friendshipId },
+        include: {
+          user: {
+            select: {
+              username: true,
+            },
+          },
+          friend: {
+            select: {
+              username: true,
+            },
+          },
+        },
+      });
+
+      if (!friendship) {
+        throw new Error("Friendship not found");
+      }
+
+      if (friendship.accepted) {
+        throw new Error("Cannot reject an already accepted friendship");
+      }
+
+      // Delete the friendship request
+      await prisma.friendship.delete({
+        where: { id: friendship.id },
+      });
+
+      return { message: "Friend request rejected successfully" };
+    } catch (error) {
+      throw new Error(`Failed to reject friend request: ${error}`);
     }
   }
 }

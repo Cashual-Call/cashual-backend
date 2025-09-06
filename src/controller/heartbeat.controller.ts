@@ -19,7 +19,7 @@ export class HeartbeatController {
       });
     }
 
-    const result = await this.roomStateService.heartbeat(roomId, senderId);
+    const result = await this.roomStateService.heartbeat(roomId, rest.senderUsername!);
 
     const message =
       result.state?.state === "offline"
