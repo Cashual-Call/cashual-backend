@@ -9,11 +9,42 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
+// Support multiple frontend URLs for different environments
+const getTrustedOrigins = () => {
+  const origins = [FRONTEND_URL];
+  
+  // Add production domains
+  if (process.env.NODE_ENV === "production") {
+    origins.push("https://cashualcall.com", "https://www.cashualcall.com");
+  }
+  
+  // Add any additional Vercel preview URLs if specified
+  if (process.env.VERCEL_URL) {
+    origins.push(`https://${process.env.VERCEL_URL}`);
+  }
+  
+  return origins;
+};
+
 export const auth = betterAuth({
-  trustedOrigins: [FRONTEND_URL],
+  trustedOrigins: getTrustedOrigins(),
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:8080",
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 60 * 5, // 5 minutes
+    },
+  },
+  advanced: {
+    crossSubDomainCookies: {
+      enabled: true,
+      domain: process.env.NODE_ENV === "production" ? ".cashualcall.com" : undefined,
+    },
+    generateId: false,
+  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,

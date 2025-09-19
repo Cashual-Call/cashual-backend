@@ -37,9 +37,26 @@ const httpServer = createServer(app);
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
+// Support multiple frontend URLs for different environments
+const getAllowedOrigins = () => {
+  const origins = [FRONTEND_URL, "https://admin.socket.io"];
+  
+  // Add production domains
+  if (process.env.NODE_ENV === "production") {
+    origins.push("https://cashualcall.com", "https://www.cashualcall.com");
+  }
+  
+  // Add any additional Vercel preview URLs if specified
+  if (process.env.VERCEL_URL) {
+    origins.push(`https://${process.env.VERCEL_URL}`);
+  }
+  
+  return origins;
+};
+
 const io = new Server(httpServer, {
   cors: {
-    origin: [FRONTEND_URL, "https://admin.socket.io"],
+    origin: getAllowedOrigins(),
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -57,34 +74,21 @@ Promise.all([pubClient, subClient]).then(([pub, sub]) => {
   setupWebSocketHandlers(io);
 });
 
-
-
-
 // Middleware
-app.use((req, res, next) => {
-  const allowed = ['https://cashual-frontend.vercel.app'];
-  const origin = req.headers.origin;
-  if (allowed.includes(origin as string)) {
-    res.setHeader('Access-Control-Allow-Origin', origin as string);
-  }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  next();
-});
-
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: getAllowedOrigins(),
     credentials: true,
     allowedHeaders: [
       'Content-Type',
       'Authorization',
       'X-Requested-With',
       'Accept',
-      'Origin'
+      'Origin',
+      'Cookie'
     ],
-    exposedHeaders: ['Set-Cookie']
+    exposedHeaders: ['Set-Cookie'],
+    optionsSuccessStatus: 200 // Some legacy browsers (IE11, various SmartTVs) choke on 204
   })
 );
 app.use(helmet());
