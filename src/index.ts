@@ -41,7 +41,7 @@ const io = new Server(httpServer, {
   cors: {
     origin: [FRONTEND_URL, "https://admin.socket.io"],
     methods: ["GET", "POST"],
-    credentials: false,
+    credentials: true,
   },
 });
 
@@ -57,11 +57,22 @@ Promise.all([pubClient, subClient]).then(([pub, sub]) => {
   setupWebSocketHandlers(io);
 });
 
+
+
+
 // Middleware
 app.use(
   cors({
     origin: FRONTEND_URL,
     credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin'
+    ],
+    exposedHeaders: ['Set-Cookie']
   })
 );
 app.use(helmet());
