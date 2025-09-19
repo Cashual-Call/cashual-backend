@@ -4,18 +4,30 @@ import { generateToken } from "../middleware/socket.middleware";
 import RoomService from "./room.service";
 import { RoomStateService } from "./room-state.service";
 import { RoomType } from "@prisma/client";
-
+import { FriendsService } from "./friend.service";
 interface MatchPayload {
   userId: string;
   roomId: string;
   token: string;
+  isFriend: boolean;
 }
+
+
+const setUserToPreventMatch = async (userId: string) => {
+  await redis.set(`user_prevent_match:${userId}`, "true", "EX", 7);
+};
+
+const checkPrevent = async (userId: string): Promise<string | null> => {
+  return await redis.get(`user_prevent_match:${userId}`);
+};
+
 
 export class MatchService {
   private searchType: string;
-  private availableUserService: AvailableUserService;
+  public availableUserService: AvailableUserService;
   private roomService: RoomService;
   private roomStateService: RoomStateService;
+  private friendService: FriendsService;
 
   constructor(searchType: string) {
     this.searchType = searchType;
@@ -24,6 +36,7 @@ export class MatchService {
       searchType === "chat" ? RoomType.CHAT : RoomType.CALL
     );
     this.roomStateService = new RoomStateService();
+    this.friendService = new FriendsService();
   }
 
   async addUser(userId: string, username: string, interests: string[]) {
@@ -53,7 +66,7 @@ export class MatchService {
 
     if (resp) {
       const payload = JSON.parse(resp) as MatchPayload;
-      // await redis.del(`match:${this.searchType}:${userId}`);
+      await redis.hdel(`match:${this.searchType}:${userId}`, "data");
       return payload;
     } else {
       return null;
@@ -66,12 +79,20 @@ export class MatchService {
     user1Username: string = "",
     user2Username: string = ""
   ) {
-    const room = await this.roomService.createRoom(
-      user1,
-      user2,
-      user1Username,
-      user2Username
-    );
+    // Batch all async operations that can run in parallel
+    const [
+      room,
+      isFriend
+    ] = await Promise.all([
+      this.roomService.createRoom(
+        user1,
+        user2,
+        user1Username,
+        user2Username
+      ),
+      this.friendService.areFriends(user1Username || user1, user2Username || user2)
+    ]);
+    
     const roomId = room.id;
 
     // Initialize room state for heartbeat tracking
@@ -104,10 +125,31 @@ export class MatchService {
       receiverUsername: user1Username,
     });
 
-    await this.availableUserService.removeUser(user1);
-    await this.availableUserService.removeUser(user2);
-
+    // Batch user removal and match data storage in a single pipeline
     const pipeline = redis.pipeline();
+
+    // Remove users from available pool
+    // Get user interests first for efficient removal
+    const [user1Interests, user2Interests] = await Promise.all([
+      redis.zrange(`user_interests:${this.searchType}:${user1}`, 0, -1),
+      redis.zrange(`user_interests:${this.searchType}:${user2}`, 0, -1)
+    ]);
+
+    // Batch remove user1
+    pipeline.zrem(`users:${this.searchType}`, user1);
+    pipeline.del(`user:${this.searchType}:${user1}`);
+    for (const interest of user1Interests) {
+      pipeline.zrem(`interest:${this.searchType}:${interest}`, user1);
+    }
+    pipeline.del(`user_interests:${this.searchType}:${user1}`);
+
+    // Batch remove user2
+    pipeline.zrem(`users:${this.searchType}`, user2);
+    pipeline.del(`user:${this.searchType}:${user2}`);
+    for (const interest of user2Interests) {
+      pipeline.zrem(`interest:${this.searchType}:${interest}`, user2);
+    }
+    pipeline.del(`user_interests:${this.searchType}:${user2}`);
 
     // Store the match data as JSON string under 'data' field
     pipeline.hset(
@@ -117,6 +159,7 @@ export class MatchService {
         userId: user2Username || user2,
         token: token1,
         roomId,
+        isFriend,
       })
     );
 
@@ -127,6 +170,7 @@ export class MatchService {
         userId: user1Username || user1,
         token: token2,
         roomId,
+        isFriend,
       })
     );
 
@@ -136,152 +180,140 @@ export class MatchService {
   async bestMatch() {
     const availableUsers = await this.availableUserService.getAvailableUsers();
     console.log(`${this.searchType} availableUsers`, availableUsers);
-
+  
     if (availableUsers.length < 2) {
       return;
     }
-
-    // Create a matrix of common interests between all users
-    const commonInterestsMatrix: {
-      [key: string]: { [key: string]: string[] };
-    } = {};
-
-    // Calculate common interests between all pairs of users
+  
+    // Create pairs and batch calculate common interests to reduce Redis calls
+    const userPairs: Array<{
+      user1: { userId: string; username: string; interests: string[] };
+      user2: { userId: string; username: string; interests: string[] };
+    }> = [];
+  
+    // Generate all valid pairs (excluding same username)
     for (let i = 0; i < availableUsers.length; i++) {
       for (let j = i + 1; j < availableUsers.length; j++) {
         const user1 = availableUsers[i];
         const user2 = availableUsers[j];
-
+  
         // Skip matching users with the same username
         if (user1.username === user2.username) {
           continue;
         }
-
-        const commonInterests =
-          await this.availableUserService.getCommonInterests(
-            user1.userId,
-            user2.userId
-          );
-
-        if (!commonInterestsMatrix[user1.userId]) {
-          commonInterestsMatrix[user1.userId] = {};
-        }
-        if (!commonInterestsMatrix[user2.userId]) {
-          commonInterestsMatrix[user2.userId] = {};
-        }
-
-        commonInterestsMatrix[user1.userId][user2.userId] = commonInterests;
-        commonInterestsMatrix[user2.userId][user1.userId] = commonInterests;
+  
+        userPairs.push({ user1, user2 });
       }
     }
-
+  
+    // Batch calculate common interests for all pairs
+    const commonInterestsPromises = userPairs.map(async ({ user1, user2 }) => {
+      const commonInterests = await this.availableUserService.getCommonInterests(
+        user1.userId,
+        user2.userId
+      );
+      return {
+        user1Id: user1.userId,
+        user2Id: user2.userId,
+        user1Username: user1.username,
+        user2Username: user2.username,
+        commonInterests,
+        score: commonInterests.length
+      };
+    });
+  
+    const pairScores = await Promise.all(commonInterestsPromises);
+  
+    // Sort pairs by score (descending) for optimal matching
+    pairScores.sort((a, b) => b.score - a.score);
+  
     // Keep track of matched users to avoid matching them again
     const matchedUsers = new Set<string>();
+    const matchPromises: Promise<void>[] = [];
+  
+    // Greedily match pairs with highest scores first
+    for (const pair of pairScores) {
+      // Skip if either user is already matched
+      if (matchedUsers.has(pair.user1Id) || matchedUsers.has(pair.user2Id)) {
+        continue;
+      }
 
-    // Continue matching until we have 0 or 1 users left
-    while (
-      availableUsers.filter((user) => !matchedUsers.has(user.userId)).length >=
-      2
-    ) {
-      const unmatchedUsers = availableUsers.filter(
-        (user) => !matchedUsers.has(user.userId)
+      const prevent1 = await checkPrevent(pair.user1Id);
+      const prevent2 = await checkPrevent(pair.user2Id);
+      
+      if (prevent1 || prevent2) {
+        continue;
+      }
+  
+      // Mark users as matched
+      matchedUsers.add(pair.user1Id);
+      matchedUsers.add(pair.user2Id);
+      await setUserToPreventMatch(pair.user1Id);
+      await setUserToPreventMatch(pair.user2Id);
+  
+      // Queue the match operation
+      matchPromises.push(
+        this.setMatch(
+          pair.user1Id,
+          pair.user2Id,
+          pair.user1Username,
+          pair.user2Username
+        ).then(() => {
+          console.log(
+            `Matched users ${pair.user1Id} and ${pair.user2Id} with ${pair.score} common interests`
+          );
+        })
       );
-
-      // Find the best match among unmatched users
-      let bestMatch: {
-        user1: string;
-        user2: string;
-        user1Username: string;
-        user2Username: string;
-        score: number;
-      } | null = null;
-
-      for (let i = 0; i < unmatchedUsers.length; i++) {
-        for (let j = i + 1; j < unmatchedUsers.length; j++) {
-          const user1 = unmatchedUsers[i];
-          const user2 = unmatchedUsers[j];
-
-          // Skip matching users with the same username
-          if (user1.username === user2.username) {
-            continue;
-          }
-
-          const commonInterests =
-            commonInterestsMatrix[user1.userId][user2.userId];
-          const score = commonInterests ? commonInterests.length : 0;
-
-          if (!bestMatch || score > bestMatch.score) {
-            bestMatch = {
-              user1: user1.userId,
-              user2: user2.userId,
-              user1Username: user1.username,
-              user2Username: user2.username,
-              score,
-            };
-          }
-        }
-      }
-
-      // If we found a match with common interests, use it
-      if (bestMatch && bestMatch.score > 0) {
-        await this.setMatch(
-          bestMatch.user1,
-          bestMatch.user2,
-          bestMatch.user1Username,
-          bestMatch.user2Username
-        );
-        console.log(
-          `Matched users ${bestMatch.user1} and ${bestMatch.user2} with ${bestMatch.score} common interests`
-        );
-
-        // Mark these users as matched
-        matchedUsers.add(bestMatch.user1);
-        matchedUsers.add(bestMatch.user2);
-      } else {
-        // No good matches found, match randomly (but still avoid same username)
-        const eligibleUsers = unmatchedUsers.filter(user => {
-          return unmatchedUsers.some(otherUser => 
-            otherUser.userId !== user.userId && otherUser.username !== user.username
-          );
-        });
-
-        if (eligibleUsers.length >= 2) {
-          const randomUser1 =
-            eligibleUsers[Math.floor(Math.random() * eligibleUsers.length)];
-          const remainingUsers = eligibleUsers.filter(
-            (user) => user.userId !== randomUser1.userId && user.username !== randomUser1.username
-          );
-          
-          if (remainingUsers.length > 0) {
-            const randomUser2 =
-              remainingUsers[Math.floor(Math.random() * remainingUsers.length)];
-
-            console.log(randomUser1, randomUser2);
-
-            await this.setMatch(
-              randomUser1.userId,
-              randomUser2.userId,
-              randomUser1.username,
-              randomUser2.username
-            );
-            console.log(
-              `Randomly matched users ${randomUser1.userId} and ${randomUser2.userId} (no common interests found)`
-            );
-
-            // Mark these users as matched
-            matchedUsers.add(randomUser1.userId);
-            matchedUsers.add(randomUser2.userId);
-          } else {
-            // No eligible users to match randomly, break the loop
-            break;
-          }
-        } else {
-          // Not enough eligible users to match, break the loop
-          break;
-        }
-      }
     }
+  
+    // Handle remaining unmatched users with random pairing
+    const unmatchedUsers = availableUsers.filter(
+      (user) => !matchedUsers.has(user.userId)
+    );
+  
+    // Randomly pair remaining users (avoiding same username)
+    while (unmatchedUsers.length >= 2) {
+      const user1 = unmatchedUsers.shift()!;
+      
+      // Find a compatible user (different username)
+      const compatibleIndex = unmatchedUsers.findIndex(
+        (user) => user.username !== user1.username
+      );
+      
+      if (compatibleIndex === -1) {
+        // No compatible users left
+        break;
+      }
+      
+      const user2 = unmatchedUsers.splice(compatibleIndex, 1)[0];
 
+      const prevent1 = await checkPrevent(user1.userId);
+      const prevent2 = await checkPrevent(user2.userId);
+
+      if (prevent1 || prevent2) {
+        continue;
+      }
+      
+      matchPromises.push(
+        this.setMatch(
+          user1.userId,
+          user2.userId,
+          user1.username,
+          user2.username
+        ).then(() => {
+          console.log(
+            `Randomly matched users ${user1.userId} and ${user2.userId} (no common interests found)`
+          );
+        })
+      );
+      
+      matchedUsers.add(user1.userId);
+      matchedUsers.add(user2.userId);
+    }
+  
+    // Execute all matches in parallel
+    await Promise.all(matchPromises);
+  
     const remainingUsers = availableUsers.filter(
       (user) => !matchedUsers.has(user.userId)
     );

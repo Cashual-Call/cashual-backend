@@ -35,7 +35,7 @@ export class NotificationController {
    */
   subscribeToPush = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const subscription: PushSubscriptionRequest = req.body.subscription;
       const userAgent = req.get('User-Agent');
 
@@ -193,7 +193,7 @@ export class NotificationController {
    */
   unsubscribeFromPush = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const { endpoint } = req.body;
 
       if (!userId) {
@@ -282,7 +282,7 @@ export class NotificationController {
    */
   getUnreadCount = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
 
       if (!userId) {
         res.status(401).json({
@@ -314,7 +314,7 @@ export class NotificationController {
    */
   markAsRead = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const { id } = req.params;
 
       if (!userId) {
@@ -364,7 +364,7 @@ export class NotificationController {
    */
   markAllAsRead = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
 
       if (!userId) {
         res.status(401).json({
@@ -482,7 +482,7 @@ export class NotificationController {
    */
   getNotificationPreferences = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
 
       if (!userId) {
         res.status(401).json({
@@ -514,7 +514,7 @@ export class NotificationController {
    */
   updateNotificationPreferences = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const preferences = req.body;
 
       if (!userId) {
@@ -556,7 +556,7 @@ export class NotificationController {
    */
   deleteNotification = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const { id } = req.params;
 
       if (!userId) {
@@ -606,7 +606,7 @@ export class NotificationController {
    */
   clearAllNotifications = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
 
       if (!userId) {
         res.status(401).json({
@@ -639,7 +639,7 @@ export class NotificationController {
    */
   bulkActions = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const { action, notificationIds } = req.body;
 
       if (!userId) {
@@ -838,7 +838,7 @@ export class NotificationController {
    */
   getNotificationHistory = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const {
         startDate,
         endDate,

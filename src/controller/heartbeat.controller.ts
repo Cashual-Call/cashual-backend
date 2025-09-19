@@ -40,7 +40,7 @@ export class HeartbeatController {
         success: false,
         error: result.error,
         roomId,
-        user: req.user?.publicKey,
+        user: req.user?.username,
       });
     }
   };

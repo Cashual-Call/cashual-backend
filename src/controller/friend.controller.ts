@@ -14,7 +14,7 @@ export class FriendsController {
    */
   getFriendsList = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey; // Assuming you have authentication middleware that sets req.user
+      const userId = req.user?.username; // Assuming you have authentication middleware that sets req.user
 
       if (!userId) {
         res.status(401).json({
@@ -114,7 +114,7 @@ export class FriendsController {
    */
   removeFriend = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const { friendId } = req.params;
 
       if (!userId) {
@@ -167,7 +167,7 @@ export class FriendsController {
     res: Response
   ): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const { friendId } = req.params;
 
       if (!userId) {
@@ -212,7 +212,7 @@ export class FriendsController {
    */
   getFriendSuggestions = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.publicKey;
+      const userId = req.user?.username;
       const limit = parseInt(req.query.limit as string) || 10;
 
       if (!userId) {

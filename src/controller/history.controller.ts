@@ -15,13 +15,13 @@ export class HistoryController {
   }
 
   async getRooms(req: Request, res: Response) {
-    const publicKey = req.user?.publicKey || "";
+    const username = req.user?.username || "";
 
     const rooms = await prisma.room.findMany({
       where: {
         OR: [
-          { user1: { publicKey: publicKey } },
-          { user2: { publicKey: publicKey } },
+          { user1: { username } },
+          { user2: { username } },
         ],
       },
       include: {
@@ -34,11 +34,11 @@ export class HistoryController {
   }
 
   async getChatHistory(req: Request, res: Response) {
-    const publicKey = req.user?.publicKey || "";
+    const username = req.user?.username || "";
 
     // TODO: CREATE USER SERVICE
     const user = await prisma.user.findUnique({
-      where: { publicKey },
+      where: { username },
     });
 
     if (!user) {
@@ -54,18 +54,18 @@ export class HistoryController {
   }
 
   async getCallHistory(req: Request, res: Response) {
-    const publicKey = req.user?.publicKey || "";
+    const username = req.user?.username || "";
 
     try {
       // const user = await prisma.user.findUnique({
-      //   where: { publicKey },
+      //   where: { username },
       // });
 
       // if (!user) {
       //   return res.status(404).json({ error: "User not found" });
       // }
 
-      // TODO: await this.callDBService.getCalls(publicKey);
+      // TODO: await this.callDBService.getCalls(username);
       const callHistory: any[] = [];
       res.json({ data: callHistory });
     } catch (error) {

@@ -3,6 +3,8 @@ import { UserService } from "../service/user.service";
 import { redis } from "../lib/redis";
 import { getUserId, verifyUserId } from "../utils/user-id";
 import { prisma } from "../lib/prisma";
+import { auth } from "../lib/auth";
+import { generateToken } from "../middleware/auth.middleware";
 
 export class UserController {
   private userService: UserService;
@@ -22,17 +24,10 @@ export class UserController {
 
   createUser = async (req: Request, res: Response) => {
     try {
-      const {
-        username,
-        publicKey,
-        gender,
-        ipAddress,
-        avatarUrl,
-        walletAddress,
-      } = req.body;
+      const { username, gender, ipAddress, avatarUrl, walletAddress } =
+        req.body;
       const user = await this.userService.createUser({
         username,
-        publicKey,
         gender,
         ipAddress,
         avatarUrl,
@@ -103,12 +98,11 @@ export class UserController {
   updateUser = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { username, publicKey, gender, avatarUrl, isPro, proEnd } =
-        req.body;
+      const { name, email, gender, avatarUrl, isPro, proEnd } = req.body;
 
       const user = await this.userService.updateUser(id, {
-        username,
-        publicKey,
+        name,
+        email,
         gender,
         avatarUrl,
         isPro,
@@ -243,7 +237,6 @@ export class UserController {
         data: {
           id: data.id,
           username: data.username,
-          publicKey: data.publicKey,
           walletAddress: data.walletAddress,
           gender: data.gender,
           avatarUrl: data.avatarUrl,
@@ -278,7 +271,7 @@ export class UserController {
       const users = await this.userService.searchUsersByUsername(query);
 
       // Format the response data
-      const formattedUsers = users.map(user => ({
+      const formattedUsers = users.map((user) => ({
         id: user.id,
         username: user.username,
         avatarUrl: user.avatarUrl,
@@ -303,10 +296,10 @@ export class UserController {
   };
 
   getPoints = async (req: Request, res: Response) => {
-    const publicKey = req.user?.publicKey || "";
+    const username = req.user?.username || "";
     const { startDate, endDate } = req.query;
     const points = await this.userService.getPoints(
-      publicKey,
+      username,
       new Date(startDate as string),
       new Date(endDate as string)
     );
@@ -314,8 +307,8 @@ export class UserController {
   };
 
   getUserPointsByDate = async (req: Request, res: Response) => {
-    const publicKey = req.user?.publicKey || "";
-    const points = await this.userService.getUserPointsByDate(publicKey);
+    const username = req.user?.username || "";
+    const points = await this.userService.getUserPointsByDate(username);
     res.json({ points });
   };
 
@@ -327,7 +320,7 @@ export class UserController {
   getLuckyWinner = async (_: Request, res: Response) => {
     try {
       const cacheKey = "lucky_winner:latest";
-      
+
       // Try to get from cache first
       const cached = await redis.get(cacheKey);
       if (cached) {
@@ -352,4 +345,37 @@ export class UserController {
       res.status(500).json({ error: "Failed to get lucky winner" });
     }
   };
+
+  async updateProfile(req: Request, res: Response): Promise<void> {
+    const { avatar, gender, walletAddress } = req.body;
+    const username = req.user?.username || "";
+
+    try {
+      // Use authapi to update or create user profile
+      const response = await auth.api.updateUser({
+        body: {
+          image: avatar,
+          gender: String(gender).toUpperCase(),
+          walletAddress,
+          username,
+        },
+      });
+
+      if (response.status) {
+        res.status(200).json({
+          message: "Profile updated successfully",
+          token: generateToken({
+            username,
+            walletAddress,
+          }),
+          user: response,
+        });
+      } else {
+        res.status(400).json({ message: "Failed to update profile" });
+      }
+    } catch (error) {
+      console.error("Profile update error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
 }

@@ -67,12 +67,21 @@ export class FriendsService {
   /**
    * Send a friend request (create friendship)
    */
-  async sendFriendRequest(username: string, friendId: string) {
+  async sendFriendRequest(username: string, friendUsername: string) {
     try {
+      // Validate input parameters
+      if (!username || !friendUsername) {
+        throw new Error("Username and friend username are required");
+      }
+
+      if (username === friendUsername) {
+        throw new Error("Cannot send friend request to yourself");
+      }
+
       // Check if users exist
       const [user, friend] = await Promise.all([
         prisma.user.findUnique({ where: { username: username } }),
-        prisma.user.findUnique({ where: { username: friendId } }),
+        prisma.user.findUnique({ where: { username: friendUsername } }),
       ]);
 
       if (!user) {
@@ -83,16 +92,12 @@ export class FriendsService {
         throw new Error("Friend not found");
       }
 
-      if (user.id === friend.id || user.username === friend.username) {
-        throw new Error("Cannot send friend request to yourself");
-      }
-
       // Check if friendship already exists
       const existingFriendship = await prisma.friendship.findFirst({
         where: {
           OR: [
-            { username: username, friendId: friendId },
-            { username: friend.username, friendId: user.id },
+            { username: username, friendId: friendUsername },
+            { username: friendUsername, friendId: username },
           ],
         },
       });
@@ -109,7 +114,7 @@ export class FriendsService {
       const friendship = await prisma.friendship.create({
         data: {
           username: username,
-          friendId: friendId,
+          friendId: friendUsername,
         },
         include: {
           friend: {
@@ -127,8 +132,8 @@ export class FriendsService {
       // Send notification to the friend about the new friend request
       try {
         await this.notificationService.sendNotification(
-          friend.username,
-          NotificationService.NotificationTypes.FRIEND_REQUEST(user.username),
+          friend.username || "",
+          NotificationService.NotificationTypes.FRIEND_REQUEST(user.username || ""),
           { sendPush: true, saveToDb: true }
         );
       } catch (notificationError) {
@@ -144,7 +149,7 @@ export class FriendsService {
         await this.notificationService.sendNotification(
           username,
           NotificationService.NotificationTypes.FRIEND_ACCEPTED(
-            friend.username
+            friend.username || ""
           ),
           { sendPush: true, saveToDb: true }
         );
@@ -173,7 +178,7 @@ export class FriendsService {
   /**
    * Remove a friend
    */
-  async removeFriend(username: string, friendId: string) {
+  async removeFriend(username: string, friendUsername: string) {
     try {
       // Get user by username to get their ID
       const user = await prisma.user.findUnique({
@@ -188,20 +193,8 @@ export class FriendsService {
       const friendship = await prisma.friendship.findFirst({
         where: {
           OR: [
-            { username: username, friendId: friendId },
-            {
-              username: {
-                in: [
-                  await prisma.user
-                    .findUnique({
-                      where: { id: friendId },
-                      select: { username: true },
-                    })
-                    .then((f) => f?.username || ""),
-                ],
-              },
-              friendId: user.id,
-            },
+            { username: username, friendId: friendUsername },
+            { username: friendUsername, friendId: username },
           ],
         },
       });
@@ -212,7 +205,7 @@ export class FriendsService {
 
       // Get friend details for notification
       const friend = await prisma.user.findUnique({
-        where: { id: friendId },
+        where: { username: friendUsername },
         select: { username: true },
       });
 
@@ -224,7 +217,7 @@ export class FriendsService {
       if (friend) {
         try {
           await this.notificationService.sendNotification(
-            friend.username,
+            friend.username || "",
             NotificationService.NotificationTypes.SYSTEM_ANNOUNCEMENT(
               "Friend Removed",
               `${user.username} removed you from their friends list`
@@ -249,7 +242,7 @@ export class FriendsService {
   /**
    * Check if two users are friends
    */
-  async areFriends(username: string, friendId: string): Promise<boolean> {
+  async areFriends(username: string, friendUsername: string): Promise<boolean> {
     try {
       // Get user by username to get their ID
       const user = await prisma.user.findUnique({
@@ -264,20 +257,8 @@ export class FriendsService {
       const friendship = await prisma.friendship.findFirst({
         where: {
           OR: [
-            { username: username, friendId: friendId },
-            {
-              username: {
-                in: [
-                  await prisma.user
-                    .findUnique({
-                      where: { id: friendId },
-                      select: { username: true },
-                    })
-                    .then((f) => f?.username || ""),
-                ],
-              },
-              friendId: user.id,
-            },
+            { username: username, friendId: friendUsername },
+            { username: friendUsername, friendId: username },
           ],
         },
       });
@@ -303,10 +284,10 @@ export class FriendsService {
         throw new Error("User not found");
       }
 
-      // Get current friend IDs
+      // Get current friend usernames
       const friendships = await prisma.friendship.findMany({
         where: {
-          OR: [{ username: username }, { friendId: user.id }],
+          OR: [{ username: username }, { friendId: username }],
         },
         select: {
           username: true,
@@ -314,16 +295,16 @@ export class FriendsService {
         },
       });
 
-      const friendIds = friendships.map((f) =>
-        f.username === username ? f.friendId : user.id
+      const friendUsernames = friendships.map((f) =>
+        f.username === username ? f.friendId : f.username
       );
 
       // Get users who are not friends and not the current user
       const suggestions = await prisma.user.findMany({
         where: {
           AND: [
-            { id: { not: user.id } },
-            { id: { notIn: friendIds } },
+            { username: { not: username } },
+            { username: { notIn: friendUsernames } },
             { isBanned: false },
           ],
         },
@@ -436,9 +417,9 @@ export class FriendsService {
           data: { accepted: true },
         });
         await this.notificationService.sendNotification(
-          friendship.user.username,
+          friendship.user.username || "",
           NotificationService.NotificationTypes.FRIEND_ACCEPTED(
-            friendship.friend.username
+            friendship.friend.username || ""
           ),
           { sendPush: true, saveToDb: true }
         );

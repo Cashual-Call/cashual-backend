@@ -1,11 +1,13 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt, { SignOptions } from 'jsonwebtoken';
-import { config } from '../config';
-
+import { Request, Response, NextFunction } from "express";
+import jwt, { SignOptions } from "jsonwebtoken";
+import { config } from "../config";
+import { auth } from "../lib/auth";
+import { fromNodeHeaders } from "better-auth/node";
 export interface UserJWTPayload {
-  publicKey: string;
+  username: string;
   walletAddress?: string;
-  username?: string;
+  name?: string;
+  email?: string;
 }
 
 declare global {
@@ -17,32 +19,25 @@ declare global {
 }
 
 export const generateToken = (obj: UserJWTPayload): string => {
-  const options: SignOptions = { expiresIn: '24h' };
+  const options: SignOptions = { expiresIn: "24h" };
   return jwt.sign(obj, config.jwt.secret, options);
 };
 
-export const verifyToken = (
+export const verifyToken = async (
   req: Request,
   res: Response,
   next: NextFunction,
   safe = false
-): void => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.split(' ')[1];
-
-  if (!token) {
-    if (safe) {
-      console.log("Returning from verifyTokenSafe");
-      next();
+): Promise<void> => {
+  try {
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+    if (!session) {
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
-    res.status(401).json({success: false, message: 'Unauthorized' });
-    return;
-  }
-
-  try {
-    const decoded = jwt.verify(token, config.jwt.secret) as UserJWTPayload;
-    req.user = decoded;
+    req.user = session?.user as unknown as UserJWTPayload;
     next();
   } catch (error) {
     if (safe) {
@@ -50,12 +45,16 @@ export const verifyToken = (
       next();
       return;
     }
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(401).json({ message: "Invalid token" });
     return;
   }
 };
 
-export const verifyTokenSafe = (req: Request, res: Response, next: NextFunction) => {
+export const verifyTokenSafe = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   verifyToken(req, res, next, true);
 };
 
@@ -65,10 +64,10 @@ export const verifyTokenForLogin = (
   next: NextFunction
 ): void => {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.split(' ')[1];
+  const token = authHeader?.split(" ")[1];
 
   if (!token) {
-    res.status(401).json({ message: 'No token provided' });
+    res.status(401).json({ message: "No token provided" });
     return;
   }
 
@@ -77,7 +76,7 @@ export const verifyTokenForLogin = (
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(401).json({ message: "Invalid token" });
     return;
   }
-}; 
+};

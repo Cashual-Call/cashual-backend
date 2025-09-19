@@ -20,8 +20,9 @@ export class UserService {
   }
 
   async createUser(userData: {
-    username: string;
-    publicKey?: string;
+    name?: string;
+    email?: string;
+    username?: string;
     gender?: Gender;
     ipAddress?: string;
     avatarUrl?: string;
@@ -31,7 +32,9 @@ export class UserService {
       return await prisma.user.create({
         data: {
           ...userData,
-          publicKey: userData.publicKey || "",
+          username: userData.username || "",
+          name: userData.name || "",
+          email: userData.email || "",
         },
       });
     } catch (error) {
@@ -73,7 +76,7 @@ export class UserService {
   async getUserByUsername(username: string): Promise<User | null> {
     try {
       return await prisma.user.findUnique({
-        where: { username },
+        where: { username: username },
         include: {
           initiatedCalls: true,
           receivedCalls: true,
@@ -96,13 +99,21 @@ export class UserService {
     }
   }
 
-  async searchUsersByUsername(query: string): Promise<{id: string, username: string, avatarUrl: string | null, gender: Gender | null, isPro: boolean}[]> {
+  async searchUsersByUsername(query: string): Promise<
+    {
+      id: string;
+      username: string;
+      avatarUrl: string | null;
+      gender: Gender | null;
+      isPro: boolean;
+    }[]
+  > {
     try {
-      return await prisma.user.findMany({
+      const users = await prisma.user.findMany({
         where: {
           username: {
             contains: query,
-            mode: 'insensitive',
+            mode: "insensitive",
           },
         },
         select: {
@@ -114,9 +125,18 @@ export class UserService {
         },
         take: 20, // Limit results to 20 users
         orderBy: {
-          username: 'asc',
+          username: "asc",
         },
       });
+
+      // Ensure gender is of type Gender | null, not string | null
+      return users
+        .filter((user) => user.username !== null)
+        .map((user) => ({
+          ...user,
+          username: user.username!,
+          gender: user.gender as Gender | null,
+        }));
     } catch (error) {
       console.error("Failed to search users by username", error);
       return [];
@@ -141,8 +161,8 @@ export class UserService {
   async updateUser(
     id: string,
     userData: {
-      username?: string;
-      publicKey?: string;
+      name?: string;
+      email?: string;
       gender?: Gender;
       avatarUrl?: string;
       isPro?: boolean;
@@ -223,7 +243,7 @@ export class UserService {
   async checkUsernameAvailability(username: string): Promise<boolean> {
     try {
       const existingUser = await prisma.user.findUnique({
-        where: { username },
+        where: { username: username },
       });
       return !existingUser;
     } catch (error) {

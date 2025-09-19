@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { instrument } from "@socket.io/admin-ui";
+import { json } from "body-parser";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -27,6 +28,8 @@ import { ExpressAdapter } from "@bull-board/express";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { messageQueue, matchQueue } from "./lib/queue";
+import { auth } from "./lib/auth";
+import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 // import { name, version } from "../package.json";
 
 const app = express();
@@ -42,10 +45,10 @@ const io = new Server(httpServer, {
   },
 });
 
-instrument(io, {
-  auth: false,
-  mode: (process.env.NODE_ENV as "development" | "production") || "development",
-});
+// instrument(io, {
+//   auth: false,
+//   mode: (process.env.NODE_ENV as "development" | "production") || "development",
+// });
 
 // Set up Redis adapter for Socket.IO
 Promise.all([pubClient, subClient]).then(([pub, sub]) => {
@@ -57,14 +60,15 @@ Promise.all([pubClient, subClient]).then(([pub, sub]) => {
 // Middleware
 app.use(
   cors({
-    origin: "*",
+    origin: FRONTEND_URL,
     credentials: true,
   })
 );
 app.use(helmet());
 app.use(morgan("dev"));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.all("/api/auth/*splat", toNodeHandler(auth));
+app.use(json());
+app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-secret-key",
@@ -78,7 +82,8 @@ app.use(
 );
 
 // Use routes
-app.use("/api/v1/auth", authRouter);
+// app.use("/api/v1/auth", authRouter);
+
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/search", searchRouter);
 app.use("/api/v1/history", historyRouter);
