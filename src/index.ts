@@ -61,6 +61,18 @@ Promise.all([pubClient, subClient]).then(([pub, sub]) => {
 
 
 // Middleware
+app.use((req, res, next) => {
+  const allowed = ['https://casualcall.vercel.app'];
+  const origin = req.headers.origin;
+  if (allowed.includes(origin as string)) {
+    res.setHeader('Access-Control-Allow-Origin', origin as string);
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  next();
+});
+
 app.use(
   cors({
     origin: FRONTEND_URL,
