@@ -62,7 +62,7 @@ Promise.all([pubClient, subClient]).then(([pub, sub]) => {
 
 // Middleware
 app.use((req, res, next) => {
-  const allowed = ['https://casualcall.vercel.app'];
+  const allowed = ['https://cashual-frontend.vercel.app'];
   const origin = req.headers.origin;
   if (allowed.includes(origin as string)) {
     res.setHeader('Access-Control-Allow-Origin', origin as string);
