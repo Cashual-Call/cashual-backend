@@ -77,6 +77,7 @@ export function setupChatHandlers(io: Server) {
           senderUsername: "",
           receiverUsername: "",
         };
+
     redis.set(`chat:total-users`, io.engine.clientsCount);
 
     const chatRecieverController = new ChatReceiverController(

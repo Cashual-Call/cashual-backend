@@ -18,6 +18,8 @@ router.post("/call/stop-search/:userId", callSearchController.stopSearch as Requ
 router.post("/call/heartbeat/:userId", callSearchController.heartbeat as RequestHandler);
 router.get("/call/:userId", callSearchController.getMatch as RequestHandler);
 
+router.post("/public-room", chatSearchController.createPublicRoom as RequestHandler);
+
 router.post("/chat/start-search/:userId", chatSearchController.startSearch as RequestHandler);
 router.post("/chat/stop-search/:userId", chatSearchController.stopSearch as RequestHandler);
 router.post("/chat/heartbeat/:userId", chatSearchController.heartbeat as RequestHandler);

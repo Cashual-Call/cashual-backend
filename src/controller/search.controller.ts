@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { MatchService } from "../service/match.service";
+import { generateToken } from "../middleware/socket.middleware";
 import { verifyUserId } from "../utils/user-id";
 
 export class SearchController {
@@ -12,12 +13,17 @@ export class SearchController {
     this.stopSearch = this.stopSearch.bind(this);
     this.getMatch = this.getMatch.bind(this);
     this.heartbeat = this.heartbeat.bind(this);
+    this.createPublicRoom = this.createPublicRoom.bind(this);
   }
 
   async startSearch(req: Request, res: Response) {
     const { userId } = req.params;
 
-    const result = await this.matchService.addUser(userId, req.user?.username || "", []);
+    const result = await this.matchService.addUser(
+      userId,
+      req.user?.username || "",
+      []
+    );
 
     res.status(200).json({ message: "Search started", data: { user: result } });
     return;
@@ -69,6 +75,27 @@ export class SearchController {
     await this.matchService.updateUserHeartbeat(userId);
 
     res.status(200).json({ message: "Heartbeat updated" });
+    return;
+  }
+
+  async createPublicRoom(req: Request, res: Response) {
+    const jwt = generateToken({
+      senderId: req.user?.username || req.user?.name || "",
+      receiverId: "public-room",
+      roomId: "general",
+    });
+
+    res.status(200).json({
+      message: "Public room Token created",
+      data: {
+        jwt,
+        data: {
+          senderId: req.user?.username || req.user?.name || "",
+          receiverId: "public-room",
+          roomId: "general",
+        },
+      },
+    });
     return;
   }
 }

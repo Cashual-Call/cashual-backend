@@ -182,7 +182,7 @@ export class ChatReceiverController {
               message.receiverId,
               message.roomId
             )
-          : await this.chatDBService.addGlobalMessage(
+          : await this.chatDBService.addGlobalMessage( // todo: fix this
               message.content,
               message.senderId
             );

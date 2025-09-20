@@ -62,14 +62,6 @@ app.use(
   cors({
     origin: FRONTEND_URL,
     credentials: true,
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'X-Requested-With',
-      'Accept',
-      'Origin'
-    ],
-    exposedHeaders: ['Set-Cookie']
   })
 );
 app.use(helmet());

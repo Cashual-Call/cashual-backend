@@ -270,27 +270,17 @@ export class MatchService {
     const unmatchedUsers = availableUsers.filter(
       (user) => !matchedUsers.has(user.userId)
     );
-  
+
     // Randomly pair remaining users (avoiding same username)
     while (unmatchedUsers.length >= 2) {
       const user1 = unmatchedUsers.shift()!;
-      
-      // Find a compatible user (different username)
-      const compatibleIndex = unmatchedUsers.findIndex(
-        (user) => user.username !== user1.username
-      );
-      
-      if (compatibleIndex === -1) {
-        // No compatible users left
-        break;
-      }
-      
-      const user2 = unmatchedUsers.splice(compatibleIndex, 1)[0];
+      const user2 = unmatchedUsers.shift()!;
 
       const prevent1 = await checkPrevent(user1.userId);
       const prevent2 = await checkPrevent(user2.userId);
 
       if (prevent1 || prevent2) {
+        console.log(`Skipping match for users ${user1.userId} and ${user2.userId} because they are prevented from matching`);
         continue;
       }
       
