@@ -12,6 +12,7 @@ export class HeartbeatController {
     const token = authHeader?.split(" ")[1] as string;
     const { roomId, senderId, ...rest } = verifyToken(token);
 
+
     if (!roomId) {
       return res.status(406).json({
         success: false,
@@ -19,7 +20,10 @@ export class HeartbeatController {
       });
     }
 
-    const result = await this.roomStateService.heartbeat(roomId, senderId!);
+    // @ts-ignore
+    const userId = req.user.id as string;
+
+    const result = await this.roomStateService.heartbeat(roomId, userId, senderId);
 
     const message =
       result.state?.state === "offline"

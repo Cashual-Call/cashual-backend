@@ -53,7 +53,8 @@ export class RoomStateService {
 
   async heartbeat(
     roomId: string,
-    userId: string
+    userId: string,
+    username: string,
   ): Promise<{ success: boolean; error?: string; index?: number; state?: IUser }> {
     try {
       const timenow: number = Date.now();
@@ -72,7 +73,7 @@ export class RoomStateService {
       let heartbeatCount = 0;
       let userState: any;
 
-      if (roomState.user1.id === userId) {
+      if (roomState.user1.id === username) {
         roomState.user1.lastHeartbeat = timenow;
         roomState.user1.heartbeatCount++;
         heartbeatCount = roomState.user1.heartbeatCount;
@@ -81,7 +82,7 @@ export class RoomStateService {
         
         // Award points for heartbeat activity
         await this.awardHeartbeatPoints(userId, heartbeatCount, roomState.roomType);
-      } else if (roomState.user2.id === userId) {
+      } else if (roomState.user2.id === username) {
         roomState.user2.lastHeartbeat = timenow;
         roomState.user2.heartbeatCount++;
         heartbeatCount = roomState.user2.heartbeatCount;
@@ -95,7 +96,7 @@ export class RoomStateService {
       if (!userUpdated) {
         return {
           success: false,
-          error: `User ${userId} not found in room ${roomId}. Expected users: ${roomState.user1.id}, ${roomState.user2.id}`,
+          error: `User ${username} not found in room ${roomId}. Expected users: ${roomState.user1.id}, ${roomState.user2.id}`,
         };
       }
 

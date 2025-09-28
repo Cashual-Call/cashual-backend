@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { HeartbeatController } from "../controller/heartbeat.controller";
 import { RoomStateService } from "../service/room-state.service";
+import { verifyToken } from "../middleware/auth.middleware";
+
 
 const router = Router();
 const roomStateService = new RoomStateService();
 const heartbeatController = new HeartbeatController(roomStateService);
 
-router.post("/", heartbeatController.heartbeat);
+router.post("/", verifyToken ,heartbeatController.heartbeat);
 
 export default router;
