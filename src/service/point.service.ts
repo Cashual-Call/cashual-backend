@@ -7,6 +7,7 @@ interface UserPoints {
 }
 
 interface RankingData {
+  id: string;
   rank: number;
   username: string;
   score: number;
@@ -132,13 +133,17 @@ export class PointService {
    */
   async getPoints(
     userId: string,
-    startDate: Date,
-    endDate: Date
+    startDate?: string,
+    endDate?: string
   ): Promise<number> {
     try {
+      // Convert string dates to Date objects if provided
+      const start = startDate ? new Date(startDate) : undefined;
+      const end = endDate ? new Date(endDate) : undefined;
+
       const cacheKey = `${
         this.USER_POINTS_CACHE_PREFIX
-      }:${userId}:${startDate.getTime()}:${endDate.getTime()}`;
+      }:${userId}:${start?.getTime() || "all"}:${end?.getTime() || "all"}`;
 
       // Try to get from cache first
       const cached = await redis.get(cacheKey);
@@ -146,14 +151,18 @@ export class PointService {
         return parseInt(cached);
       }
 
+      const whereClause: any = { userId };
+
+      // Only add date filters if both startDate and endDate are provided
+      if (start && end) {
+        whereClause.createdAt = {
+          gte: start,
+          lte: end,
+        };
+      }
+
       const result = await prisma.pointActivity.aggregate({
-        where: {
-          userId,
-          createdAt: {
-            gte: startDate,
-            lte: endDate,
-          },
-        },
+        where: whereClause,
         _sum: {
           point: true,
         },
@@ -292,71 +301,7 @@ export class PointService {
   /**
    * Get all users' points for a specific date
    */
-  async getAllUserPointsByDate(date: Date, mock: boolean = true): Promise<RankingData[]> {
-    if (mock) {
-      return [
-        {
-          username: "alice_crypto",
-          score: 1250,
-          rank: 1,
-          avatar: "https://via.placeholder.com/150",
-        },
-        {
-          username: "bob_trader",
-          score: 980,
-          rank: 2,
-          avatar: "https://via.placeholder.com/150",
-        },
-        {
-          username: "charlie_dev",
-          score: 760,
-          rank: 3,
-          avatar: "https://via.placeholder.com/150",
-        },
-        {
-          username: "diana_nft",
-          score: 540,
-          rank: 4,
-          avatar: "https://via.placeholder.com/150",
-        },
-        {
-          username: "evan_defi",
-          score: 420,
-          rank: 5,
-          avatar: "https://via.placeholder.com/150",
-        },
-        {
-          username: "fiona_web3",
-          score: 380,
-          rank: 6,
-          avatar: "https://via.placeholder.com/150",
-        },
-        {
-          username: "george_dao",
-          score: 320,
-          rank: 7,
-          avatar: "https://via.placeholder.com/150",
-        },
-        {
-          username: "helen_metaverse",
-          score: 280,
-          rank: 8,
-          avatar: "https://via.placeholder.com/150",
-        },
-        {
-          username: "ivan_gamefi",
-          score: 240,
-          rank: 9,
-          avatar: "https://via.placeholder.com/150",
-        },
-        {
-          username: "jane_blockchain",
-          score: 200,
-          rank: 10,
-          avatar: "https://via.placeholder.com/150",
-        },
-      ];
-    }
+  async getAllUserPointsByDate(date: Date): Promise<RankingData[]> {
     try {
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
@@ -380,21 +325,22 @@ export class PointService {
         },
       });
 
-      // Get user avatars separately
       const userIds = results.map(r => r.userId);
       const users = await prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, avatarUrl: true },
+        select: { id: true, image: true, username: true, name: true },
       });
-
-      const userMap = new Map(users.map(u => [u.id, u.avatarUrl]));
-
-      return results.map((result) => ({
-        username: result.userId,
-        score: result._sum.point || 0,
-        rank: result._count.id,
-        avatar: userMap.get(result.userId) || undefined,
-      }));
+      
+      return users.map(user => {
+        const result = results.find(r => r.userId === user.id);
+        return {
+          id: user.id,
+          avatar: user.image ?? undefined,
+          username: user.username || user.name || "",
+          score: result?._sum.point ?? 0,
+          rank: result?._count.id ?? 0
+        };
+      });
     } catch (error) {
       console.error("Failed to get all user points by date:", error);
       throw new Error("Failed to get all user points by date");

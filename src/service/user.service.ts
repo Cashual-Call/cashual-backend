@@ -273,8 +273,8 @@ export class UserService {
 
   async getPoints(
     userId: string,
-    startDate: Date,
-    endDate: Date
+    startDate?: string,
+    endDate?: string
   ): Promise<number> {
     return this.pointService.getPoints(userId, startDate, endDate);
   }

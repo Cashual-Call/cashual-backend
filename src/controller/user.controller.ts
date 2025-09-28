@@ -294,14 +294,13 @@ export class UserController {
     const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
     res.json({ isValid, ipAddress });
   };
-
   getPoints = async (req: Request, res: Response) => {
     const username = req.user?.username || "";
     const { startDate, endDate } = req.query;
     const points = await this.userService.getPoints(
       username,
-      new Date(startDate as string),
-      new Date(endDate as string)
+      typeof startDate === 'string' ? startDate : undefined,
+      typeof endDate === 'string' ? endDate : undefined,
     );
     res.json({ points });
   };
