@@ -20,30 +20,14 @@ export const auth = betterAuth({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
-    // twitter: {
-    //   clientId: process.env.TWITTER_CLIENT_ID!,
-    //   clientSecret: process.env.TWITTER_CLIENT_SECRET!,
-    // },
-    // apple: {
-    //   clientId: process.env.APPLE_CLIENT_ID!,
-    //   clientSecret: process.env.APPLE_CLIENT_SECRET!,
-    // },
+    twitter: {
+      clientId: process.env.TWITTER_CLIENT_ID!,
+      clientSecret: process.env.TWITTER_CLIENT_SECRET!,
+    },
     discord: {
       clientId: process.env.DISCORD_CLIENT_ID!,
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
     },
-    // pinterest: {
-    //   clientId: process.env.PINTEREST_CLIENT_ID!,
-    //   clientSecret: process.env.PINTEREST_CLIENT_SECRET!,
-    // },
-    // reddit: {
-    //   clientId: process.env.REDDIT_CLIENT_ID!,
-    //   clientSecret: process.env.REDDIT_CLIENT_SECRET!,
-    // },
-    // spotify: {
-    //   clientId: process.env.SPOTIFY_CLIENT_ID!,
-    //   clientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
-    // },
   },
   emailAndPassword: {
     enabled: true,
