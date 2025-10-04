@@ -10,16 +10,16 @@ const userController = new UserController();
 const router = Router();
 
 router.get("/avatars", userController.getAvailableAvatars as RequestHandler);
-router.get(
-  "/check-username",
-  userController.checkUsernameAvailability as RequestHandler
-);
+// router.get(
+//   "/check-username",
+//   userController.checkUsernameAvailability as RequestHandler
+// );
 router.get("/user-id", userController.getUserId as RequestHandler);
-router.get("/user-by-username/:username", validateResponse, userController.getUserByUsername as RequestHandler);
+router.get("/user-by-username/:username", userController.getUserByUsername as RequestHandler);
 router.post("/user-id", userController.verifyUserId as RequestHandler);
 
 router.get("/points", userController.getPoints as RequestHandler);
-router.get("/points-by-date", userController.getUserPointsByDate as RequestHandler);
+router.get("/points-by-date", verifyToken, userController.getUserPointsByDate as RequestHandler);
 router.get("/rankings", validateResponse, userController.getRankings as RequestHandler);
 router.get("/lucky-winner", validateResponse, userController.getLuckyWinner as RequestHandler);
 

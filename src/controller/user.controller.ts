@@ -236,12 +236,12 @@ export class UserController {
       res.json({
         data: {
           id: data.id,
-          username: data.username,
+          username: data.username || data.name || data.displayUsername,
           walletAddress: data.walletAddress,
-          gender: data.gender,
-          avatarUrl: data.avatarUrl,
-          interests: data.interests,
-          isPro: data.isPro,
+          gender: data.gender || "other",
+          avatarUrl: data.avatarUrl || data.image,
+          interests: data.interests || [],
+          isPro: data.isPro || false,
           isBanned: data.isBanned,
           createdAt: data.createdAt,
         },

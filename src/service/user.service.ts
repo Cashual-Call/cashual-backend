@@ -75,8 +75,14 @@ export class UserService {
 
   async getUserByUsername(username: string): Promise<User | null> {
     try {
-      return await prisma.user.findUnique({
-        where: { username: username },
+      return await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: username },
+            { name: username },
+            { displayUsername: username },
+          ],
+        },
         include: {
           initiatedCalls: true,
           receivedCalls: true,

@@ -21,8 +21,10 @@ import socketAuthMiddleware from "./middleware/socket.middleware";
 import uploadRouter from "./routes/upload.route";
 import { addRecurringJob, cleanup as matchCleanup } from "./cron/match.cron";
 import { addRecurringJob as addHeartbeatJob, cleanup as heartbeatCleanup } from "./cron/heartbeat.cron";
+import { addRecurringJob as addSubscriptionJob, cleanup as subscriptionCleanup } from "./cron/subscription.cron";
 import searchRouter from "./routes/search.route";
 import heartbeatRouter from "./routes/heartbeat.route";
+import paymentRouter from "./routes/payment.route";
 import path from "path";
 import { ExpressAdapter } from "@bull-board/express";
 import { createBullBoard } from "@bull-board/api";
@@ -89,6 +91,7 @@ app.use("/api/v1/search", searchRouter);
 app.use("/api/v1/history", historyRouter);
 app.use("/api/v1/upload", uploadRouter);
 app.use("/api/v1/heartbeat", heartbeatRouter);
+app.use("/api/v1/payment", paymentRouter);
 
 // Bull Board setup
 const serverAdapter = new ExpressAdapter();
@@ -168,6 +171,12 @@ addHeartbeatJob()
   })
   .catch(console.error);
 
+addSubscriptionJob()
+  .then(() => {
+    console.log("Subscription check job Started...");
+  })
+  .catch(console.error);
+
 httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
@@ -180,6 +189,7 @@ process.on("SIGTERM", async () => {
   await subClient.quit();
   await matchCleanup();
   await heartbeatCleanup();
+  await subscriptionCleanup();
   
   httpServer.close(() => {
     console.log("HTTP server closed");

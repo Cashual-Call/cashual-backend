@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { Resend } from "resend";
 import { magicLink, username, admin, anonymous } from "better-auth/plugins";
 import generateUniqueName from "../utils/unique";
+import { Email } from "./email";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -73,8 +74,8 @@ export const auth = betterAuth({
         await resend.emails.send({
           from: "Acme <onboarding@resend.dev>",
           to: email,
-          subject: "Magic Link",
-          html: `Click the link to login into your account: ${url}`,
+          subject: "Continue with Cashual Call",
+          react: Email({ url }),
         });
       },
     }),
