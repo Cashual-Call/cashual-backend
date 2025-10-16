@@ -4,6 +4,7 @@ import { config } from "../config";
 import { auth } from "../lib/auth";
 import { fromNodeHeaders } from "better-auth/node";
 export interface UserJWTPayload {
+  id: string;
   username: string;
   walletAddress?: string;
   name?: string;

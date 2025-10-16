@@ -1,8 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { redis } from "../lib/redis";
 import { prisma } from "../lib/prisma";
-import { RateLimiterMemory } from "rate-limiter-flexible";
-import { CallEvent } from "../config/websocket";
 import { verifyToken } from "../middleware/socket.middleware";
 
 // Extend global interface to include io property

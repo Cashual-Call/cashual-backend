@@ -4,6 +4,8 @@ import { verifyToken } from "../middleware/auth.middleware";
 
 const router = Router();
 
+// ==================== HELIO PAYMENT ROUTES ====================
+
 /**
  * @route   POST /api/v1/payment/success
  * @desc    Handle successful payment from Helio
@@ -32,6 +34,37 @@ router.post("/webhook", PaymentController.handleHelioWebhook);
  * @access  Private (requires authentication)
  */
 router.get("/status", verifyToken, PaymentController.getSubscriptionStatus);
+
+// ==================== DODOPAYMENTS ROUTES ====================
+
+/**
+ * @route   POST /api/v1/payment/dodo/create-link
+ * @desc    Create a DodoPayments payment link
+ * @access  Private (requires authentication)
+ */
+router.post("/dodo/create-link", verifyToken, PaymentController.createDodoPaymentLink);
+
+/**
+ * @route   POST /api/v1/payment/dodo/checkout-url
+ * @desc    Get a static DodoPayments checkout URL
+ * @access  Private (requires authentication)
+ */
+router.post("/dodo/checkout-url", verifyToken, PaymentController.getDodoStaticCheckoutUrl);
+
+/**
+ * @route   POST /api/v1/payment/dodo/webhook
+ * @desc    Handle DodoPayments webhook callbacks
+ * @access  Public (webhook from DodoPayments servers)
+ * @note    This endpoint is secured with DodoPayments webhook signature verification
+ */
+router.post("/dodo/webhook", PaymentController.handleDodoWebhook);
+
+/**
+ * @route   POST /api/v1/payment/dodo/verify
+ * @desc    Verify a DodoPayments payment and update user subscription
+ * @access  Private (requires authentication)
+ */
+router.post("/dodo/verify", verifyToken, PaymentController.verifyDodoPayment);
 
 export default router;
 

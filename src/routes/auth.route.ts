@@ -62,6 +62,7 @@ router.post("/verify", (async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = generateToken({
+      id: existingUser?.id || "",
       username,
       walletAddress: existingUser?.walletAddress || "",
     });

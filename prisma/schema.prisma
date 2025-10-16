@@ -163,6 +163,7 @@ model Subscription {
   plan      Plan
   startedAt DateTime @default(now())
   expiresAt DateTime
+  paymentId String?  @unique
 
   // Relations
   user User @relation(fields: [userId], references: [id])

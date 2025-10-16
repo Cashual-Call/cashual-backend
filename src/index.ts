@@ -2,22 +2,17 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
-import { instrument } from "@socket.io/admin-ui";
 import { json } from "body-parser";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import bodyParser from "body-parser";
 import session from "express-session";
 import "dotenv/config";
-import authRouter from "./routes/auth.route";
 import { setupWebSocketHandlers } from "./websocket";
 import { pubClient, subClient } from "./lib/redis";
 import { prisma } from "./lib/prisma";
-import { validateResponse } from "./middleware/validate.middleware";
 import userRouter from "./routes/user.route";
 import historyRouter from "./routes/history.route";
-import socketAuthMiddleware from "./middleware/socket.middleware";
 import uploadRouter from "./routes/upload.route";
 import { addRecurringJob, cleanup as matchCleanup } from "./cron/match.cron";
 import { addRecurringJob as addHeartbeatJob, cleanup as heartbeatCleanup } from "./cron/heartbeat.cron";
@@ -25,14 +20,13 @@ import { addRecurringJob as addSubscriptionJob, cleanup as subscriptionCleanup }
 import searchRouter from "./routes/search.route";
 import heartbeatRouter from "./routes/heartbeat.route";
 import paymentRouter from "./routes/payment.route";
-import path from "path";
+import reportRouter from "./routes/report.route";
 import { ExpressAdapter } from "@bull-board/express";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { messageQueue, matchQueue } from "./lib/queue";
 import { auth } from "./lib/auth";
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
-// import { name, version } from "../package.json";
 
 const app = express();
 const httpServer = createServer(app);
@@ -92,6 +86,7 @@ app.use("/api/v1/history", historyRouter);
 app.use("/api/v1/upload", uploadRouter);
 app.use("/api/v1/heartbeat", heartbeatRouter);
 app.use("/api/v1/payment", paymentRouter);
+app.use("/api/v1/reports", reportRouter);
 
 // Bull Board setup
 const serverAdapter = new ExpressAdapter();

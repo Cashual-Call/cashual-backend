@@ -23,7 +23,7 @@ router.get("/points-by-date", verifyToken, userController.getUserPointsByDate as
 router.get("/rankings", validateResponse, userController.getRankings as RequestHandler);
 router.get("/lucky-winner", validateResponse, userController.getLuckyWinner as RequestHandler);
 
-router.post("/update-profile", verifyToken, userController.updateProfile as RequestHandler);
+// router.post("/update-profile", verifyToken, userController.updateProfile as RequestHandler);
 
 router.use("/friends", friendRouter);
 router.use("/notifications", notificationRouter);

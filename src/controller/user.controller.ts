@@ -344,37 +344,4 @@ export class UserController {
       res.status(500).json({ error: "Failed to get lucky winner" });
     }
   };
-
-  async updateProfile(req: Request, res: Response): Promise<void> {
-    const { avatar, gender, walletAddress } = req.body;
-    const username = req.user?.username || "";
-
-    try {
-      // Use authapi to update or create user profile
-      const response = await auth.api.updateUser({
-        body: {
-          image: avatar,
-          gender: String(gender).toUpperCase(),
-          walletAddress,
-          username,
-        },
-      });
-
-      if (response.status) {
-        res.status(200).json({
-          message: "Profile updated successfully",
-          token: generateToken({
-            username,
-            walletAddress,
-          }),
-          user: response,
-        });
-      } else {
-        res.status(400).json({ message: "Failed to update profile" });
-      }
-    } catch (error) {
-      console.error("Profile update error:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  }
 }
