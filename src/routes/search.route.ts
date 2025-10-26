@@ -18,6 +18,7 @@ router.post("/call/stop-search/:userId", callSearchController.stopSearch as Requ
 router.post("/call/heartbeat/:userId", callSearchController.heartbeat as RequestHandler);
 router.get("/call/:userId", callSearchController.getMatch as RequestHandler);
 
+// create public room token
 router.post("/public-room", chatSearchController.createPublicRoom as RequestHandler);
 
 router.post("/chat/start-search/:userId", chatSearchController.startSearch as RequestHandler);

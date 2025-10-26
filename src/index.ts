@@ -26,7 +26,7 @@ import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { messageQueue, matchQueue } from "./lib/queue";
 import { auth } from "./lib/auth";
-import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
+import { toNodeHandler } from "better-auth/node";
 
 const app = express();
 const httpServer = createServer(app);

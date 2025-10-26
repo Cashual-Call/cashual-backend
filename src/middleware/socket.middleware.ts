@@ -41,8 +41,11 @@ const socketAuthMiddleware = (socket: Socket, next: any) => {
   }
 };
 
-export const generateToken = (obj: SocketJWTPayload): string => {
-  const options: SignOptions = { expiresIn: "7d" };
+export const generateToken = (
+  obj: SocketJWTPayload,
+  expiresIn: number | string | undefined = "7d"
+): string => {
+  const options: SignOptions = { expiresIn: expiresIn as any };
   return jwt.sign(obj, config.jwt.secret, options);
 };
 

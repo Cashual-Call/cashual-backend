@@ -61,6 +61,7 @@ export class MatchService {
     return await this.availableUserService.cleanupInactiveUsers(timeoutMs);
   }
 
+  // always run after setMatch
   async getMatchedJWT(userId: string) {
     const resp = await redis.hget(`match:${this.searchType}:${userId}`, "data");
 
@@ -90,7 +91,7 @@ export class MatchService {
         user1Username,
         user2Username
       ),
-      this.friendService.areFriends(user1Username || user1, user2Username || user2)
+      (await this.friendService.areFriends(user1Username || user1, user2Username || user2)).areFriends
     ]);
     
     const roomId = room.id;

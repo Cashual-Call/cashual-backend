@@ -12,11 +12,6 @@ export enum ChatEvent {
   USER_DISCONNECTED = "user_disconnected",
   USER_CONNECTED = "user_connected",
   FRIEND_REQUEST = "friend_request",
-  FRIEND_REQUEST_SENT = "friend_request_sent",
-  FRIEND_REQUEST_ACCEPT = "friend_request_accept",
-  FRIEND_REQUEST_REJECT = "friend_request_reject",
-  FRIEND_REMOVED = "friend_removed",
-  FRIEND_STATUS_UPDATE = "friend_status_update",
   ERROR = "error",
   RECONNECT = "reconnect",
 }

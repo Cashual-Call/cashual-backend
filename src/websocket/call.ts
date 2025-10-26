@@ -2,6 +2,7 @@ import { Server, Socket } from "socket.io";
 import { redis } from "../lib/redis";
 import { prisma } from "../lib/prisma";
 import { verifyToken } from "../middleware/socket.middleware";
+import { FriendsService } from "../service/friend.service";
 
 // Extend global interface to include io property
 declare global {
@@ -15,7 +16,10 @@ enum SocketEvents {
   LOBBY = "lobby",
   ADD_ICE_CANDIDATE = "add-ice-candidate",
   USER_EVENT = "user-event",
+  FRIEND_REQUEST = "friend-request",
+  ERROR = "error",
 }
+
 interface CallRoom {
   id: string;
   participants: string[];
@@ -29,8 +33,6 @@ interface CallUser {
 }
 
 class CallUserManager {
-  private roomCounter = 1;
-
   async addUser(socket: Socket, roomId: string) {
     const user: CallUser = {
       socketId: socket.id,
@@ -215,16 +217,12 @@ class CallUserManager {
   }
 }
 
-function validateRoomId(roomId: string): boolean {
-  // Add your room ID validation logic here
-  return /^[a-zA-Z0-9-_]{3,50}$/.test(roomId);
-}
-
 export function setupCallHandlers(io: Server) {
   // Store io instance globally for access in CallUserManager
   (global as any).io = io;
 
   const userManager = new CallUserManager();
+  const friendsService = new FriendsService();
 
   io.of("/call").on("connection", (socket: Socket) => {
     // console.log("[Call] Socket connected:", socket.id);
@@ -245,7 +243,7 @@ export function setupCallHandlers(io: Server) {
           receiverUsername: "",
         };
 
-        console.log("roomIduhewrige", roomId);
+    console.log("roomIduhewrige", roomId);
 
     redis.set(`call:total-users`, io.engine.clientsCount);
 
@@ -357,6 +355,34 @@ export function setupCallHandlers(io: Server) {
             type: data.type,
           }
         );
+      }
+    );
+
+    socket.on(
+      SocketEvents.FRIEND_REQUEST,
+      async (data: { friendUsername: string }) => {
+        try {
+          const result = await friendsService.sendFriendRequest(
+            senderUsername,
+            data.friendUsername
+          );
+          await userManager.forwardToRoom(
+            roomId,
+            socket.id,
+            SocketEvents.FRIEND_REQUEST,
+            { event: result }
+          );
+          console.log("Friend request sent successfully");
+        } catch (error) {
+          console.error("Error sending friend request:", error);
+          socket.emit(SocketEvents.ERROR, {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Failed to send friend request",
+          });
+          console.log("Friend request failed to send");
+        }
       }
     );
   });

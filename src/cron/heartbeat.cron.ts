@@ -7,7 +7,7 @@ import logger from "../config/logger";
 const roomStateService = new RoomStateService();
 
 // Setup Redlock for distributed locking
-const redlock = new Redlock([redis], {
+const redlock = new Redlock([redis as any], {
   retryCount: 1, 
 });
 
@@ -27,7 +27,7 @@ const processHeartbeatJob = async () => {
     } catch (err) {
       logger.error("[HeartbeatCron] Error processing heartbeat job:", err);
     } finally {
-      await lock.release();
+      await redlock.release(lock);
     }
   } catch (lockErr) {
     // Lock not acquired, another instance is running the job

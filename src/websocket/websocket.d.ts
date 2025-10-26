@@ -9,7 +9,8 @@ interface RoomEvent {
     | "typing"
     | "stopped_typing"
     | "connected"
-    | "disconnected";
+    | "disconnected"
+    | "friend_request";
   roomId: string;
   clientId: string;
   username: string;

@@ -233,7 +233,7 @@ model PushSubscription {
   updatedAt DateTime @updatedAt
 
   // Relations
-  user User @relation(fields: [userId], references: [username])
+  user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, endpoint])
   @@index([userId])

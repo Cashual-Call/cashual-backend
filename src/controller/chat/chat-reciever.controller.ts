@@ -5,10 +5,12 @@ import { ChatEvent } from "../../config/websocket";
 import ChatDBService from "../../service/chat-db.service";
 import { RoomStateService } from "../../service/room-state.service";
 import { RedisHash } from "../../config/redis-hash";
+import { FriendsService } from "../../service/friend.service";
 
 export class ChatReceiverController {
   private chatDBService: ChatDBService;
   private roomStateService: RoomStateService;
+  private friendsService: FriendsService;
   private socket: Socket;
 
   private roomId: string;
@@ -25,6 +27,7 @@ export class ChatReceiverController {
 
     this.chatDBService = new ChatDBService();
     this.roomStateService = new RoomStateService();
+    this.friendsService = new FriendsService();
     this.roomId = roomId;
     this.senderId = senderId;
     this.receiverId = receiverId;
@@ -321,6 +324,22 @@ export class ChatReceiverController {
       );
     } catch (error) {
       console.error("Error handling user connected:", error);
+    }
+  }
+
+  async friendRequest(data: { friendUsername: string }) {
+    try {
+      const result = await this.friendsService.sendFriendRequest(
+        this.senderId,
+        data.friendUsername
+      );
+      
+      this.socket.to(this.roomId).emit(ChatEvent.FRIEND_REQUEST, {
+        result,
+      });
+    } catch (error) {
+      console.error("Error sending friend request:", error);
+      this.socket.emit(ChatEvent.ERROR, error instanceof Error ? error.message : "Failed to send friend request");
     }
   }
 }

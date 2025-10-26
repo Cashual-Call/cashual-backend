@@ -37,6 +37,7 @@ export const auth = betterAuth({
       walletAddress: { type: "string", required: false, defaultValue: "" },
       isPro: { type: "boolean", defaultValue: false },
       gender: { type: "string", required: false, defaultValue: "" },
+      interests: { type: "string[]", required: false, defaultValue: [] },
     },
   },
   onAPIError: {

@@ -35,7 +35,7 @@ export class NotificationController {
    */
   subscribeToPush = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.username;
+      const userId = req.user?.id;
       const subscription: PushSubscriptionRequest = req.body.subscription;
       const userAgent = req.get('User-Agent');
 
@@ -87,7 +87,7 @@ export class NotificationController {
    */
   saveSubscription = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.username;
+      const userId = req.user?.id;
       const subscription: PushSubscriptionRequest = req.body; // Direct subscription object
       const userAgent = req.get('User-Agent');
 
