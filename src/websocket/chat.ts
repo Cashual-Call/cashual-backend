@@ -6,7 +6,6 @@ import { verifyToken } from "../middleware/socket.middleware";
 import { ChatEmitterController } from "../controller/chat/chat-emitter.controller";
 import { FriendsService } from "../service/friend.service";
 import { NotificationService } from "../service/notification.service";
-import { NotificationType } from "@prisma/client";
 /**
  * Sets up chat handlers for a Socket.IO server with Redis adapter for horizontal scaling
  * @param io The Socket.IO server instance
@@ -77,12 +76,28 @@ export function setupChatHandlers(io: Server) {
     } = authToken
       ? verifyToken(authToken)
       : {
+          // Default to "general" room - a public room where all unauthenticated users can chat
           roomId: "general",
           senderId: socket.id, // TODO: chanage,
           receiverId: "global",
           senderUsername: "",
           receiverUsername: "",
         };
+
+    // Validate roomId is not empty
+    if (!roomId || roomId.trim() === "") {
+      console.error("Connection rejected: invalid roomId", {
+        socketId: socket.id,
+        authToken: !!authToken,
+      });
+      socket.emit(ChatEvent.ERROR, "Invalid room configuration");
+      socket.disconnect(true);
+      return;
+    }
+
+    console.log(
+      `New chat connection: socket=${socket.id}, room=${roomId}, sender=${senderId}, receiver=${receiverId}`
+    );
 
     redis.set(`chat:total-users`, io.engine.clientsCount);
 
@@ -119,26 +134,6 @@ export function setupChatHandlers(io: Server) {
     });
 
     // Handle user typing
-    socket.on(ChatEvent.USER_TYPING, () => chatRecieverController.userTyping());
-
-    // Handle user stopped typing
-    socket.on(ChatEvent.USER_STOPPED_TYPING, () =>
-      chatRecieverController.userStoppedTyping()
-    );
-
-    // Handle user disconnected
-    socket.on(ChatEvent.USER_DISCONNECTED, () =>
-      chatRecieverController.userDisconnected()
-    );
-
-    // Handle user connected
-    socket.on(ChatEvent.USER_CONNECTED, () =>
-      chatRecieverController.userConnected()
-    );
-
-    // Handle friend request
-    socket.on(ChatEvent.FRIEND_REQUEST, (data: { friendUsername: string }) =>
-      chatRecieverController.friendRequest(data)
-    );
+    socket.on(ChatEvent.USER_EVENT, (data: { eventType: string }) => chatRecieverController.userEvent(data));
   });
 }

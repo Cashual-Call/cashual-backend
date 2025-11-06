@@ -6,6 +6,7 @@ import { Message } from "../../validation/chat.validation";
 
 export class ChatEmitterController {
   private server: Server | Namespace;
+  private isInitialized: boolean = false;
 
   constructor(server: Server | Namespace) {
     this.server = server;
@@ -14,14 +15,32 @@ export class ChatEmitterController {
   }
 
   initializeSubscriptions() {
+    // Prevent multiple initializations
+    if (this.isInitialized) {
+      console.log("Chat subscriptions already initialized, skipping");
+      return;
+    }
+
     // Subscribe to chat messages
     subClient.subscribe(RedisHash.CHAT_MESSAGES, (err, count) => {
       if (err) {
-        console.error("Subscribe error:", err);
+        console.error("Subscribe to chat messages error:", err);
         return;
       }
-      console.log(`Subscribed to ${count} channel(s)`);
+      console.log(`Subscribed to ${count} channel(s) for chat messages`);
     });
+
+    // Subscribe to chat rooms
+    subClient.subscribe(RedisHash.CHAT_ROOMS, (err, count) => {
+      if (err) {
+        console.error("Subscribe to chat rooms error:", err);
+        return;
+      }
+      console.log(`Subscribed to ${count} channel(s) for chat rooms`);
+    });
+    
+    // Remove any existing listeners before adding new one
+    subClient.removeAllListeners("message");
     
     subClient.on("message", (channel: string, message: any) => {
       if (channel === RedisHash.CHAT_MESSAGES) {
@@ -32,15 +51,40 @@ export class ChatEmitterController {
         } catch (error) {
           console.error("Error parsing chat message:", error);
         }
+      } else if (channel === RedisHash.CHAT_ROOMS) {
+        try {
+          const roomEvent: RoomEvent = JSON.parse(message);
+          
+          this.handleRoomEvent(roomEvent);
+        } catch (error) {
+          console.error("Error parsing room event:", error);
+        }
       }
     });
+
+    this.isInitialized = true;
   }
 
   private handleChatMessage(message: Message) {
+    // Validate that roomId exists and is not empty
+    if (!message.roomId || message.roomId.trim() === "") {
+      console.error("Cannot emit message: roomId is missing or empty", message);
+      return;
+    }
+
+    console.log(`Emitting message to room: ${message.roomId}`);
     this.server.to(message.roomId).emit(ChatEvent.MESSAGE, message);
   }
 
   private handleRoomEvent(event: RoomEvent) {
+    // Validate that roomId exists
+    if (!event.roomId || event.roomId.trim() === "") {
+      console.error("Cannot emit room event: roomId is missing or empty", event);
+      return;
+    }
+
+    console.log(`Emitting room event: ${event.type} to room: ${event.roomId}`);
+    
     switch (event.type) {
       case "join":
         this.server.to(event.roomId).emit(ChatEvent.USER_JOINED, event);
@@ -48,12 +92,9 @@ export class ChatEmitterController {
       case "leave":
         this.server.to(event.roomId).emit(ChatEvent.USER_LEFT, event);
         break;
-      case "typing":
-        this.server.to(event.roomId).emit(ChatEvent.USER_TYPING, event);
-        break;
-      case "stopped_typing":
-        this.server.to(event.roomId).emit(ChatEvent.USER_STOPPED_TYPING, event);
-        break;
+      case "user_event":
+        this.server.to(event.roomId).emit(ChatEvent.USER_EVENT, event);
+        break; 
       case "connected":
         this.server.to(event.roomId).emit(ChatEvent.USER_CONNECTED, event);
         break;

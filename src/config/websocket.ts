@@ -7,7 +7,7 @@ export enum ChatEvent {
   DISCONNECT = "disconnect",
   USER_JOINED = "user_joined",
   USER_LEFT = "user_left",
-  USER_TYPING = "user_typing",
+  USER_EVENT = "user_event",
   USER_STOPPED_TYPING = "user_stopped_typing",
   USER_DISCONNECTED = "user_disconnected",
   USER_CONNECTED = "user_connected",

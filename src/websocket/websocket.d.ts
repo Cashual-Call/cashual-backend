@@ -6,8 +6,7 @@ interface RoomEvent {
   type:
     | "join"
     | "leave"
-    | "typing"
-    | "stopped_typing"
+    | "user_event"
     | "connected"
     | "disconnected"
     | "friend_request";

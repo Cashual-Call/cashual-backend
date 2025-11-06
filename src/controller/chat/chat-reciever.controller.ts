@@ -144,11 +144,27 @@ export class ChatReceiverController {
     }
   ) {
     try {
+      // Validate roomId exists and matches
+      if (!this.roomId || this.roomId.trim() === "") {
+        console.error("Cannot send message: roomId is missing or empty");
+        this.socket.emit(ChatEvent.ERROR, "Invalid room");
+        return;
+      }
+
+      if (chatData.roomId !== this.roomId) {
+        console.warn(
+          `RoomId mismatch: chatData.roomId=${chatData.roomId}, this.roomId=${this.roomId}`
+        );
+        // Use this.roomId as the source of truth
+        chatData.roomId = this.roomId;
+      }
+
       const validatedData = sendMessageSchema.parse({
         ...data,
         roomId: this.roomId,
         senderId: this.senderId,
       });
+      
       // Check if user has permission to send message
       // const isUserInRoom = await redis.sismember(
       //   `chat:rooms:${this.roomId}`,
@@ -161,22 +177,28 @@ export class ChatReceiverController {
       //   return;
       // }
 
-      // Create the complete message object
+      // Create the complete message object - use this.roomId as source of truth
       const message: Message = {
         content: validatedData.content,
         senderId: chatData.senderId,
         receiverId: chatData.receiverId,
         senderUsername: chatData.senderUsername,
         receiverUsername: chatData.receiverUsername,
-        roomId: chatData.roomId,
+        roomId: this.roomId, // Use this.roomId instead of chatData.roomId
         username: chatData.senderUsername || chatData.senderId,
         type: validatedData.type,
         avatarUrl: "",
         timestamp: new Date().toISOString(),
       };
 
-      console.log("chatData", chatData);
+      console.log(
+        `Sending message from ${this.senderId} in room ${this.roomId}`,
+        { chatData, messageRoomId: message.roomId }
+      );
 
+      // "general" is a special public room where all users can chat
+      // For general room, we store messages as global (no receiver needed)
+      // For all other rooms, we store the full sender-receiver relationship
       const messageObj =
         this.roomId !== "general"
           ? await this.chatDBService.addMessage(
@@ -185,7 +207,7 @@ export class ChatReceiverController {
               message.receiverId,
               message.roomId
             )
-          : await this.chatDBService.addGlobalMessage( // todo: fix this
+          : await this.chatDBService.addGlobalMessage(
               message.content,
               message.senderId
             );
@@ -340,6 +362,36 @@ export class ChatReceiverController {
     } catch (error) {
       console.error("Error sending friend request:", error);
       this.socket.emit(ChatEvent.ERROR, error instanceof Error ? error.message : "Failed to send friend request");
+    }
+  }
+
+  async userEvent(data: { eventType: string; payload?: any }) {
+    try {
+      const event = {
+        type: data.eventType,
+        userId: this.senderId,
+        username: this.senderId,
+        roomId: this.roomId,
+        payload: data.payload,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Notify other users in the room
+      this.socket.to(this.roomId).emit(ChatEvent.USER_EVENT, event);
+
+      // Publish user event to Redis
+      await pubClient.publish(
+        RedisHash.CHAT_ROOMS,
+        JSON.stringify({
+          ...event,
+          clientId: this.socket.id,
+        })
+      );
+
+      console.log(`User event: ${data.eventType} from ${this.senderId}`);
+    } catch (error) {
+      console.error("Error handling user event:", error);
+      this.socket.emit(ChatEvent.ERROR, "Failed to process user event");
     }
   }
 }

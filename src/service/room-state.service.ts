@@ -16,8 +16,6 @@ interface RoomState {
 }
 
 const HEARTBEAT_TIMEOUT = 10000;
-const CHAT_HEARTBEAT_POINTS = 1; // Points per heartbeat in chat rooms
-const CALL_HEARTBEAT_POINTS = 2; // Points per heartbeat in call rooms
 const HEARTBEATS_PER_POINT = 10; // How many heartbeats needed to earn a point
 
 export class RoomStateService {
@@ -39,7 +37,7 @@ export class RoomStateService {
   ): Promise<void> {
     // Award points every HEARTBEATS_PER_POINT heartbeats
     if (heartbeatCount % HEARTBEATS_PER_POINT === 0) {
-      const pointsToAward = roomType === "call" ? CALL_HEARTBEAT_POINTS : CHAT_HEARTBEAT_POINTS;
+      const pointsToAward = calculatePoints(heartbeatCount, roomType);
       const description = `Heartbeat activity in ${roomType} room (${heartbeatCount} heartbeats)`;
       
       try {
