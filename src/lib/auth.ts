@@ -5,6 +5,9 @@ import { Resend } from "resend";
 import { magicLink, username, admin, anonymous } from "better-auth/plugins";
 import generateUniqueName from "../utils/unique";
 import { Email } from "./email";
+import { polar_products } from "../constants/pricing";
+import { polar, checkout, portal, usage, webhooks } from "@polar-sh/better-auth";
+import { polarClient } from "./polar";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -93,5 +96,17 @@ export const auth = betterAuth({
         });
       },
     }),
+    polar({
+      client: polarClient,
+      createCustomerOnSignUp: true,
+      use: [
+          checkout({
+              products: polar_products,
+              successUrl: `${FRONTEND_URL}/pro-success`,
+              authenticatedUsersOnly: true,
+              
+          })
+      ],
+  })
   ],
 });
