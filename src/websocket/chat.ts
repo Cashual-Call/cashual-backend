@@ -6,59 +6,28 @@ import { verifyToken } from "../middleware/socket.middleware";
 import { ChatEmitterController } from "../controller/chat/chat-emitter.controller";
 import { FriendsService } from "../service/friend.service";
 import { NotificationService } from "../service/notification.service";
+
 /**
  * Sets up chat handlers for a Socket.IO server with Redis adapter for horizontal scaling
  * @param io The Socket.IO server instance
  */
 export function setupChatHandlers(io: Server) {
-  // Setup Redis subscription handlers - need to handle reconnection scenarios
-  const setupSubscriptions = () => {
-    const subscribeWithRetry = (channel: string, retryCount = 0) => {
-      subClient.subscribe(channel, (err) => {
-        if (err) {
-          console.error(`Failed to subscribe to ${channel}:`, err);
-          if (retryCount < 3) {
-            // Retry subscription after delay with exponential backoff
-            setTimeout(
-              () => subscribeWithRetry(channel, retryCount + 1),
-              Math.pow(2, retryCount) * 1000
-            );
-          } else {
-            console.error(
-              `Failed to subscribe to ${channel} after ${retryCount} retries`
-            );
-          }
-          return;
-        }
-        console.log(`Subscribed to ${channel}`);
-      });
-    };
+  // Set up the chat namespace
+  const chatNamespace = io.of("/chat");
 
-    // Subscribe to Redis channels
-    subscribeWithRetry("chat:messages");
-    subscribeWithRetry("chat:rooms");
-  };
+  // Initialize the emitter controller which handles Redis pub/sub
+  const chatEmitterController = new ChatEmitterController(chatNamespace);
+  chatEmitterController.initializeSubscriptions();
 
-  setupSubscriptions();
-
+  // Handle Redis reconnection
   subClient.on("reconnect", () => {
-    console.log(
-      "Redis subscription client reconnected, setting up subscriptions again"
-    );
-    setupSubscriptions();
+    console.log("Redis subscription client reconnected, reinitializing subscriptions");
+    chatEmitterController.reinitializeSubscriptions();
   });
 
   subClient.on("error", (error) => {
     console.error("Redis subscription client error:", error);
-    // Attempt to reconnect after delay
-    setTimeout(setupSubscriptions, 5000);
   });
-
-  // Set up the chat namespace
-  const chatNamespace = io.of("/chat");
-
-  const chatEmitterController = new ChatEmitterController(chatNamespace);
-  chatEmitterController.initializeSubscriptions();
 
   // Initialize friends service and notification service
   const friendsService = new FriendsService();
@@ -135,5 +104,15 @@ export function setupChatHandlers(io: Server) {
 
     // Handle user typing
     socket.on(ChatEvent.USER_EVENT, (data: { eventType: string }) => chatRecieverController.userEvent(data));
+
+    // Handle custom room events - emit to other users in the same room
+    socket.on("emit_to_room", (data: { eventName: string; payload: any }) => 
+      chatRecieverController.emitToRoom(data.eventName, data.payload)
+    );
+
+    // Handle custom room broadcasts - emit to all users including sender
+    socket.on("broadcast_to_room", (data: { eventName: string; payload: any }) => 
+      chatRecieverController.broadcastToRoom(data.eventName, data.payload)
+    );
   });
 }

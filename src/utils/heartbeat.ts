@@ -1,6 +1,6 @@
 type SessionType = "call" | "chat";
 
-function calculatePoints(heartbeatCount: number, sessionType: SessionType): number {
+export function calculatePoints(heartbeatCount: number, sessionType: SessionType): number {
   const minutes = (heartbeatCount * 5) / 60;
 
   if (sessionType === "call") {

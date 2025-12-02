@@ -6,7 +6,13 @@ import { magicLink, username, admin, anonymous } from "better-auth/plugins";
 import generateUniqueName from "../utils/unique";
 import { Email } from "./email";
 import { polar_products } from "../constants/pricing";
-import { polar, checkout, portal, usage, webhooks } from "@polar-sh/better-auth";
+import {
+  polar,
+  checkout,
+  portal,
+  usage,
+  webhooks,
+} from "@polar-sh/better-auth";
 import { polarClient } from "./polar";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -41,6 +47,14 @@ export const auth = betterAuth({
       isPro: { type: "boolean", defaultValue: false },
       gender: { type: "string", required: false, defaultValue: "" },
       interests: { type: "string[]", required: false, defaultValue: [] },
+    },
+    deleteUser: {
+      enabled: true,
+      afterDelete: async (user, request) => {
+        await polarClient.customers.deleteExternal({
+          externalId: user.id,
+        });
+      },
     },
   },
   onAPIError: {
@@ -100,13 +114,52 @@ export const auth = betterAuth({
       client: polarClient,
       createCustomerOnSignUp: true,
       use: [
-          checkout({
-              products: polar_products,
-              successUrl: `${FRONTEND_URL}/pro-success`,
-              authenticatedUsersOnly: true,
-              
-          })
+        checkout({
+          products: polar_products,
+          successUrl: `${FRONTEND_URL}/payment/success`,
+          authenticatedUsersOnly: true,
+        }),
+        portal(),
+        webhooks({
+          secret: process.env.POLAR_WEBHOOK_SECRET!,
+          onOrderPaid: async (order) => {
+            await prisma.user.update({
+              where: { id: order.metadata.userId },
+              data: {
+                isPro: true,
+                proEnd: order.expiresAt,
+              },
+            });
+          },
+          onSubscriptionActive: async (subscription) => { 
+            await prisma.user.update({
+              where: { id: subscription.metadata.userId },
+              data: {
+                isPro: true,
+                proEnd: subscription.expiresAt,
+              },
+            });
+          },
+          onSubscriptionCanceled: async (subscription) => {
+            await prisma.user.update({
+              where: { id: subscription.metadata.userId },
+              data: {
+                isPro: false,
+                proEnd: null,
+              },
+            });
+          },
+          onSubscriptionUpdated: async (subscription) => {
+            await prisma.user.update({
+              where: { id: subscription.metadata.userId },
+              data: {
+                isPro: true,
+                proEnd: subscription.expiresAt,
+              },
+            });
+          },
+        })
       ],
-  })
+    }),
   ],
 });

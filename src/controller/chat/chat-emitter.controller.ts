@@ -21,13 +21,26 @@ export class ChatEmitterController {
       return;
     }
 
+    this.setupSubscriptions();
+    this.isInitialized = true;
+  }
+
+  reinitializeSubscriptions() {
+    console.log("Reinitializing chat subscriptions...");
+    this.setupSubscriptions();
+  }
+
+  private setupSubscriptions() {
+    // Remove any existing listeners before adding new one
+    subClient.removeAllListeners("message");
+
     // Subscribe to chat messages
     subClient.subscribe(RedisHash.CHAT_MESSAGES, (err, count) => {
       if (err) {
         console.error("Subscribe to chat messages error:", err);
         return;
       }
-      console.log(`Subscribed to ${count} channel(s) for chat messages`);
+      console.log(`[ChatEmitter] Subscribed to ${count} channel(s) for chat messages`);
     });
 
     // Subscribe to chat rooms
@@ -36,17 +49,15 @@ export class ChatEmitterController {
         console.error("Subscribe to chat rooms error:", err);
         return;
       }
-      console.log(`Subscribed to ${count} channel(s) for chat rooms`);
+      console.log(`[ChatEmitter] Subscribed to ${count} channel(s) for chat rooms`);
     });
-    
-    // Remove any existing listeners before adding new one
-    subClient.removeAllListeners("message");
-    
+
     subClient.on("message", (channel: string, message: any) => {
+      console.log(`[ChatEmitter] Received on channel: ${channel}`);
+      
       if (channel === RedisHash.CHAT_MESSAGES) {
         try {
           const chatMessage: Message = JSON.parse(message);
-          
           this.handleChatMessage(chatMessage);
         } catch (error) {
           console.error("Error parsing chat message:", error);
@@ -54,25 +65,26 @@ export class ChatEmitterController {
       } else if (channel === RedisHash.CHAT_ROOMS) {
         try {
           const roomEvent: RoomEvent = JSON.parse(message);
-          
           this.handleRoomEvent(roomEvent);
         } catch (error) {
           console.error("Error parsing room event:", error);
         }
       }
     });
-
-    this.isInitialized = true;
   }
 
-  private handleChatMessage(message: Message) {
+  private async handleChatMessage(message: Message) {
     // Validate that roomId exists and is not empty
     if (!message.roomId || message.roomId.trim() === "") {
       console.error("Cannot emit message: roomId is missing or empty", message);
       return;
     }
 
-    console.log(`Emitting message to room: ${message.roomId}`);
+    // Get all sockets in the room for debugging
+    const socketsInRoom = await this.server.in(message.roomId).fetchSockets();
+    console.log(`[ChatEmitter] Emitting message to room '${message.roomId}' (${socketsInRoom.length} sockets in room)`);
+    
+    // Emit to all sockets in the room
     this.server.to(message.roomId).emit(ChatEvent.MESSAGE, message);
   }
 

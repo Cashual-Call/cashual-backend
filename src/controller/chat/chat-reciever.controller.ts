@@ -192,8 +192,8 @@ export class ChatReceiverController {
       };
 
       console.log(
-        `Sending message from ${this.senderId} in room ${this.roomId}`,
-        { chatData, messageRoomId: message.roomId }
+        `[ChatReceiver] Processing message from ${this.senderId} in room ${this.roomId}`,
+        { content: message.content, type: message.type }
       );
 
       // "general" is a special public room where all users can chat
@@ -216,8 +216,8 @@ export class ChatReceiverController {
       await redis.lpush(`chat:room:${this.roomId}:messages`, messageObj.id);
       await redis.ltrim(`chat:room:${this.roomId}:messages`, 0, 99); // Keep last 100 messages
 
-      // Publish message to Redis
-      // console.log("Publishing message:", message);
+      // Publish message to Redis for broadcasting to all users in the room
+      console.log(`[ChatReceiver] Publishing message to Redis channel: ${RedisHash.CHAT_MESSAGES}`);
       await pubClient.publish(RedisHash.CHAT_MESSAGES, JSON.stringify(message));
 
       // Acknowledge message received
@@ -392,6 +392,57 @@ export class ChatReceiverController {
     } catch (error) {
       console.error("Error handling user event:", error);
       this.socket.emit(ChatEvent.ERROR, "Failed to process user event");
+    }
+  }
+
+  /**
+   * Emit a custom event to all users in the current room (except sender)
+   * @param eventName - The name of the custom event
+   * @param data - The payload to send with the event
+   */
+  async emitToRoom(eventName: string, data: any) {
+    try {
+      const event = {
+        eventName,
+        data,
+        senderId: this.senderId,
+        roomId: this.roomId,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Emit to all users in the room except the sender
+      this.socket.to(this.roomId).emit(eventName, event);
+
+      console.log(`Custom event '${eventName}' emitted to room ${this.roomId}`);
+    } catch (error) {
+      console.error(`Error emitting custom event '${eventName}':`, error);
+      this.socket.emit(ChatEvent.ERROR, `Failed to emit event: ${eventName}`);
+    }
+  }
+
+  /**
+   * Emit a custom event to all users in the current room (including sender)
+   * @param eventName - The name of the custom event
+   * @param data - The payload to send with the event
+   */
+  async broadcastToRoom(eventName: string, data: any) {
+    try {
+      const event = {
+        eventName,
+        data,
+        senderId: this.senderId,
+        roomId: this.roomId,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Emit to all users in the room including the sender
+      this.socket.emit(eventName, event);
+      this.socket.to(this.roomId).emit(eventName, event);
+
+      console.log(`Custom event '${eventName}' broadcasted to room ${this.roomId}`);
+    } catch (error) {
+      console.error(`Error broadcasting custom event '${eventName}':`, error);
+      this.socket.emit(ChatEvent.ERROR, `Failed to broadcast event: ${eventName}`);
     }
   }
 }

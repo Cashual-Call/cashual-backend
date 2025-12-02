@@ -1,5 +1,6 @@
 import { redis } from "../lib/redis";
 import { PointService } from "./point.service";
+import { calculatePoints } from "../utils/heartbeat";
 
 interface IUser {
   id: string;
