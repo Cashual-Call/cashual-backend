@@ -74,7 +74,7 @@ export const auth = betterAuth({
         token: string;
       }) => {
         await resend.emails.send({
-          from: "Acme <onboarding@resend.dev>",
+          from: "Cashual Call <no-reply@cashualcall.com>",
           to: email,
           subject: "Continue with Cashual Call",
           react: Email({ url }),
