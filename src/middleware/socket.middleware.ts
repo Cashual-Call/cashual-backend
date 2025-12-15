@@ -20,27 +20,6 @@ declare module "socket.io" {
 	}
 }
 
-const socketAuthMiddleware = (socket: Socket, next: any) => {
-	const token =
-		socket.handshake.auth?.token ||
-		socket.handshake.headers?.authorization?.split(" ")[1];
-
-	if (!token) {
-		throw new Error("No token provided");
-	}
-
-	try {
-		const secret = process.env.JWT_SECRET as string;
-		const payload = jwt.verify(token, secret) as SocketJWTPayload;
-
-		socket.user = { ...payload };
-
-		return next();
-	} catch (err) {
-		return next(new Error("Authentication failed"));
-	}
-};
-
 export const generateToken = (
 	obj: SocketJWTPayload,
 	expiresIn: number | string | undefined = "7d",
@@ -73,4 +52,3 @@ export const verifyToken = (token: string) => {
 	}
 };
 
-export default socketAuthMiddleware;
