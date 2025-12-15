@@ -15,51 +15,42 @@ router.use(verifyToken);
 
 router.get("/", friendsController.getFriendsList as RequestHandler);
 
-router.get(
-  "/pending",
-  friendsController.getPendingRequests as RequestHandler
-);
+router.get("/pending", friendsController.getPendingRequests as RequestHandler);
 
 router.get(
-  "/suggestions",
-  friendsController.getFriendSuggestions as RequestHandler
+	"/suggestions",
+	friendsController.getFriendSuggestions as RequestHandler,
 );
 
 router.post(
-  "/accept/:friendshipId",
-  friendsController.acceptFriendRequest as RequestHandler
+	"/accept/:friendshipId",
+	friendsController.acceptFriendRequest as RequestHandler,
 );
 
 router.post(
-  "/reject/:friendshipId",
-  friendsController.rejectFriendRequest as RequestHandler
+	"/reject/:friendshipId",
+	friendsController.rejectFriendRequest as RequestHandler,
 );
 
 router.post(
-  "/:friendId",
-  friendsController.sendFriendRequest as RequestHandler
+	"/:friendId",
+	friendsController.sendFriendRequest as RequestHandler,
 );
 
 router.delete("/:friendId", friendsController.removeFriend as RequestHandler);
 
 router.post(
-  "/:friendId/cancel",
-  friendsController.cancelFriendRequest as RequestHandler
+	"/:friendId/cancel",
+	friendsController.cancelFriendRequest as RequestHandler,
 );
 
 router.get(
-  "/:friendId/status",
-  friendsController.checkFriendshipStatus as RequestHandler
+	"/:friendId/status",
+	friendsController.checkFriendshipStatus as RequestHandler,
 );
 
-router.post(
-  "/:friend/chat",
-  friendChatController.startChat as RequestHandler
-);
+router.post("/:friend/chat", friendChatController.startChat as RequestHandler);
 
-router.post(
-  "/:friend/call",
-  friendCallController.startChat as RequestHandler
-);
+router.post("/:friend/call", friendCallController.startChat as RequestHandler);
 
 export default router;

@@ -13,19 +13,38 @@ router.post("/", verifyToken, reportController.createReport as RequestHandler);
 router.get("/", verifyToken, reportController.getAllReports as RequestHandler);
 
 // Get report statistics
-router.get("/stats", verifyToken, reportController.getReportStats as RequestHandler);
+router.get(
+	"/stats",
+	verifyToken,
+	reportController.getReportStats as RequestHandler,
+);
 
 // Get report by ID
-router.get("/:id", verifyToken, reportController.getReportById as RequestHandler);
+router.get(
+	"/:id",
+	verifyToken,
+	reportController.getReportById as RequestHandler,
+);
 
 // Get reports by reporter (user who made the reports)
-router.get("/reporter/:reporterId", verifyToken, reportController.getReportsByReporter as RequestHandler);
+router.get(
+	"/reporter/:reporterId",
+	verifyToken,
+	reportController.getReportsByReporter as RequestHandler,
+);
 
 // Get reports by reported user (user who was reported)
-router.get("/reported/:reportedUserId", verifyToken, reportController.getReportsByReportedUser as RequestHandler);
+router.get(
+	"/reported/:reportedUserId",
+	verifyToken,
+	reportController.getReportsByReportedUser as RequestHandler,
+);
 
 // Delete a report (admin only, add admin middleware if you have one)
-router.delete("/:id", verifyToken, reportController.deleteReport as RequestHandler);
+router.delete(
+	"/:id",
+	verifyToken,
+	reportController.deleteReport as RequestHandler,
+);
 
 export default router;
-

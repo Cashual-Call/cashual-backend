@@ -67,5 +67,3 @@ router.get("/status", verifyToken, PaymentController.getSubscriptionStatus);
 // router.post("/dodo/verify", verifyToken, PaymentController.verifyDodoPayment);
 
 export default router;
-
-

@@ -3,79 +3,76 @@ import ChatDBService from "../service/chat-db.service";
 import { prisma } from "../lib/prisma";
 
 export class HistoryController {
-  private chatDBService: ChatDBService;
+	private chatDBService: ChatDBService;
 
-  constructor() {
-    this.chatDBService = new ChatDBService();
+	constructor() {
+		this.chatDBService = new ChatDBService();
 
-    this.getChatHistory = this.getChatHistory.bind(this);
-    this.getCallHistory = this.getCallHistory.bind(this);
-    this.getRooms = this.getRooms.bind(this);
-    this.getGlobalChats = this.getGlobalChats.bind(this);
-  }
+		this.getChatHistory = this.getChatHistory.bind(this);
+		this.getCallHistory = this.getCallHistory.bind(this);
+		this.getRooms = this.getRooms.bind(this);
+		this.getGlobalChats = this.getGlobalChats.bind(this);
+	}
 
-  async getRooms(req: Request, res: Response) {
-    const username = req.user?.username || "";
+	async getRooms(req: Request, res: Response) {
+		const username = req.user?.username || "";
 
-    const rooms = await prisma.room.findMany({
-      where: {
-        OR: [
-          { user1: { username } },
-          { user2: { username } },
-        ],
-      },
-      include: {
-        user1: true,
-        user2: true,
-      },
-    });
+		const rooms = await prisma.room.findMany({
+			where: {
+				OR: [{ user1: { username } }, { user2: { username } }],
+			},
+			include: {
+				user1: true,
+				user2: true,
+			},
+		});
 
-    res.json({ data: rooms });
-  }
+		res.json({ data: rooms });
+	}
 
-  async getChatHistory(req: Request, res: Response) {
-    const username = req.user?.username || "";
+	async getChatHistory(req: Request, res: Response) {
+		const username = req.user?.username || "";
 
-    // TODO: CREATE USER SERVICE
-    const user = await prisma.user.findUnique({
-      where: { username },
-    });
+		// TODO: CREATE USER SERVICE
+		const user = await prisma.user.findUnique({
+			where: { username },
+		});
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+		if (!user) {
+			return res.status(404).json({ error: "User not found" });
+		}
 
-    const { chatRoomId } = req.query;
+		const { chatRoomId } = req.query;
 
-    const chatHistory = await this.chatDBService.getMessages(
-      chatRoomId as string
-    );
-    res.json({ data: chatHistory });
-  }
+		const chatHistory = await this.chatDBService.getMessages(
+			chatRoomId as string,
+		);
+		res.json({ data: chatHistory });
+	}
 
-  async getCallHistory(req: Request, res: Response) {
-    const username = req.user?.username || "";
+	async getCallHistory(req: Request, res: Response) {
+		const username = req.user?.username || "";
 
-    try {
-      // const user = await prisma.user.findUnique({
-      //   where: { username },
-      // });
+		try {
+			// const user = await prisma.user.findUnique({
+			//   where: { username },
+			// });
 
-      // if (!user) {
-      //   return res.status(404).json({ error: "User not found" });
-      // }
+			// if (!user) {
+			//   return res.status(404).json({ error: "User not found" });
+			// }
 
-      // TODO: await this.callDBService.getCalls(username);
-      const callHistory: any[] = [];
-      res.json({ data: callHistory });
-    } catch (error) {
-      console.error("Error fetching call history:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  }
+			// TODO: await this.callDBService.getCalls(username);
+			const callHistory: any[] = [];
+			res.json({ data: callHistory });
+		} catch (error) {
+			console.error("Error fetching call history:", error);
+			res.status(500).json({ error: "Internal server error" });
+		}
+	}
 
-  async getGlobalChats(req: Request, res: Response) {
-    const data = await this.chatDBService.getGlobalMessages();
-    res.json({ data });
-  }
+	async getGlobalChats(req: Request, res: Response) {
+		const data = await this.chatDBService.getGlobalMessages();
+		res.json({ data });
+	}
 }

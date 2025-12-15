@@ -1,407 +1,401 @@
 import * as React from "react";
 import {
-  Body,
-  Container,
-  Head,
-  Heading,
-  Html,
-  Img,
-  Link,
-  Preview,
-  Section,
-  Text,
-  Button,
-  Font,
+	Body,
+	Container,
+	Head,
+	Heading,
+	Html,
+	Img,
+	Link,
+	Preview,
+	Section,
+	Text,
+	Button,
+	Row,
+	Column,
+	Hr,
 } from "@react-email/components";
 
 interface EmailProps {
-  url: string;
+	url: string;
 }
 
 export function Email({ url }: EmailProps) {
-  const expiryTime = "10 minutes";
+	const expiryTime = "10 minutes";
 
-  return (
-    <Html>
-      <Head />
-      <Preview>
-        Verify your CasualCall account - Start connecting today!
-      </Preview>
-      <Body style={main}>
-        <Font
-          fontFamily="Space Grotesk"
-          fallbackFontFamily="Verdana"
-          webFont={{
-            url: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400&display=swap",
-            format: "woff2",
-          }}
-          fontWeight={400}
-          fontStyle="normal"
-        />
-        <Container style={wrapper}>
-          {/* Header Section */}
-          <Section style={header}>
-            <Container style={logoContainer}>
-              <Img
-                src="https://casualcall.com/logo.webp"
-                alt="CasualCall Logo"
-                width={40}
-                height={40}
-                style={logo}
-              />
-              <Text style={brandText}>
-                <span style={brandAccent}>Cashual</span>Call v2
-              </Text>
-            </Container>
-            <Heading style={h1}>Verify Your Account</Heading>
-            <Text style={headerSubtext}>
-              Click the button below to verify your email and get started
-            </Text>
-          </Section>
+	return (
+		<Html>
+			<Head>
+				<style>
+					{`
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+          `}
+				</style>
+			</Head>
+			<Preview>
+				Verify your CasualCall account - Start connecting today!
+			</Preview>
+			<Body style={main}>
+				<Container style={container}>
+					{/* Header Section */}
+					<Section style={header}>
+						<table
+							cellPadding="0"
+							cellSpacing="0"
+							border={0}
+							style={{ margin: "0 auto 24px auto" }}
+						>
+							<tr>
+								<td style={{ verticalAlign: "middle", paddingRight: "10px" }}>
+									<Img
+										src="https://cashualcall.com/logo.webp"
+										alt="CasualCall Logo"
+										width={36}
+										height={36}
+										style={logo}
+									/>
+								</td>
+								<td style={{ verticalAlign: "middle" }}>
+									<Text style={brandText}>
+										<span style={brandAccent}>Cashual</span>
+										<span style={brandWhite}>Call</span>
+									</Text>
+								</td>
+							</tr>
+						</table>
+						<Heading style={h1}>Verify Your Email</Heading>
+						<Text style={headerSubtext}>
+							One click away from connecting with the world
+						</Text>
+					</Section>
 
-          {/* Main Content Section */}
-          <Section style={mainContent}>
-            <Container style={contentWrapper}>
-              {/* Welcome Message */}
-              <Section style={welcomeCard}>
-                <Text style={welcomeText}>
-                  Welcome to <span style={brandHighlight}>CasualCall</span>! To
-                  complete your registration and start connecting with strangers
-                  through video and text chat, please verify your email address.
-                </Text>
+					{/* Main Content */}
+					<Section style={mainContent}>
+						<Text style={welcomeText}>
+							Welcome to <strong style={brandHighlight}>CasualCall</strong>!
+							We're excited to have you join our community. Verify your email to
+							start connecting with people from around the world through video
+							and text chat.
+						</Text>
 
-                {/* CTA Button */}
-                <Section style={buttonContainer}>
-                  <Button href={url} style={button}>
-                    Verify Email Address
-                  </Button>
-                </Section>
+						{/* CTA Button */}
+						<Section style={buttonSection}>
+							<Button href={url} style={ctaButton}>
+								✓ Verify My Email
+							</Button>
+						</Section>
 
-                <Text style={expiryText}>
-                  This link will expire in{" "}
-                  <span style={brandHighlight}>{expiryTime}</span>
-                </Text>
-              </Section>
+						<Text style={expiryText}>
+							⏱ This link expires in{" "}
+							<strong style={brandHighlight}>{expiryTime}</strong>
+						</Text>
 
-              {/* Alternative Link Section */}
-              <Section style={alternativeCard}>
-                <Text style={alternativeLabel}>
-                  Button not working? Copy and paste this link:
-                </Text>
-                <Container style={linkContainer}>
-                  <Link href={url} style={alternativeLink}>
-                    {url}
-                  </Link>
-                </Container>
-              </Section>
+						<Hr style={divider} />
 
-              {/* Features Section */}
-              <Section style={featuresCard}>
-                <Heading as="h2" style={h2}>
-                  What's waiting for you:
-                </Heading>
-                <Container style={featuresGrid}>
-                  {[
-                    {
-                      icon: "💬",
-                      text: "Chat anonymously with people worldwide",
-                    },
-                    { icon: "🎥", text: "Connect via voice and video calls" },
-                    { icon: "💰", text: "Earn cash rewards for conversations" },
-                    { icon: "🔒", text: "Safe and moderated community" },
-                  ].map((feature, index) => (
-                    <Section key={index} style={featureItem}>
-                      <Text style={featureIcon}>{feature.icon}</Text>
-                      <Text style={featureText}>{feature.text}</Text>
-                    </Section>
-                  ))}
-                </Container>
-              </Section>
-            </Container>
-          </Section>
+						{/* Alternative Link */}
+						<Text style={altLinkLabel}>
+							If the button doesn't work, copy and paste this link:
+						</Text>
+						<Container style={linkBox}>
+							<Link href={url} style={altLink}>
+								{url}
+							</Link>
+						</Container>
+					</Section>
 
-          {/* Footer Section */}
-          <Section style={footer}>
-            <Text style={footerText}>
-              If you didn't request this email, you can safely ignore it.
-            </Text>
-            <Text style={copyright}>
-              © 2025 CasualCall. All rights reserved.
-            </Text>
-            <Container style={footerLinks}>
-              <Link href="https://casualcall.com/privacy" style={footerLink}>
-                Privacy Policy
-              </Link>
-              <Text style={footerSeparator}>•</Text>
-              <Link href="https://casualcall.com/terms" style={footerLink}>
-                Terms of Service
-              </Link>
-              <Text style={footerSeparator}>•</Text>
-              <Link href="https://casualcall.com/support" style={footerLink}>
-                Support
-              </Link>
-            </Container>
-          </Section>
+					{/* Features Section */}
+					<Section style={featuresSection}>
+						<Text style={featuresTitle}>What awaits you:</Text>
 
-          {/* Email Client Safety Text */}
-          <Section style={disclaimer}>
-            <Text style={disclaimerText}>
-              This email was sent to verify your CasualCall account.
-            </Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
-  );
+						<Row style={featureRow}>
+							<Column style={featureColumn}>
+								<table cellPadding="0" cellSpacing="0" border={0} width="100%">
+									<tr>
+										<td style={featureIconCell}>💬</td>
+										<td style={featureTextCell}>
+											Chat anonymously with people worldwide
+										</td>
+									</tr>
+								</table>
+							</Column>
+							<Column style={featureColumn}>
+								<table cellPadding="0" cellSpacing="0" border={0} width="100%">
+									<tr>
+										<td style={featureIconCell}>🎥</td>
+										<td style={featureTextCell}>
+											Connect via voice & video calls
+										</td>
+									</tr>
+								</table>
+							</Column>
+						</Row>
+						<Row style={featureRow}>
+							<Column style={featureColumn}>
+								<table cellPadding="0" cellSpacing="0" border={0} width="100%">
+									<tr>
+										<td style={featureIconCell}>💰</td>
+										<td style={featureTextCell}>
+											Earn cash rewards for conversations
+										</td>
+									</tr>
+								</table>
+							</Column>
+							<Column style={featureColumn}>
+								<table cellPadding="0" cellSpacing="0" border={0} width="100%">
+									<tr>
+										<td style={featureIconCell}>🔒</td>
+										<td style={featureTextCell}>Safe & moderated community</td>
+									</tr>
+								</table>
+							</Column>
+						</Row>
+					</Section>
+
+					{/* Footer */}
+					<Section style={footer}>
+						<Text style={footerNote}>
+							Didn't request this email? You can safely ignore it.
+						</Text>
+						<Hr style={footerDivider} />
+						<Text style={copyright}>
+							© 2025 CasualCall. All rights reserved.
+						</Text>
+						<table
+							cellPadding="0"
+							cellSpacing="0"
+							border={0}
+							style={{ margin: "0 auto" }}
+						>
+							<tr>
+								<td style={{ padding: "0 12px" }}>
+									<Link
+										href="https://casualcall.com/privacy"
+										style={footerLink}
+									>
+										Privacy
+									</Link>
+								</td>
+								<td style={{ color: "#4a4a4a" }}>•</td>
+								<td style={{ padding: "0 12px" }}>
+									<Link href="https://casualcall.com/terms" style={footerLink}>
+										Terms
+									</Link>
+								</td>
+								<td style={{ color: "#4a4a4a" }}>•</td>
+								<td style={{ padding: "0 12px" }}>
+									<Link
+										href="https://casualcall.com/support"
+										style={footerLink}
+									>
+										Support
+									</Link>
+								</td>
+							</tr>
+						</table>
+					</Section>
+				</Container>
+			</Body>
+		</Html>
+	);
 }
 
 export default Email;
 
-// Styles
-const main = {
-  backgroundColor: "#f5f5f5",
-  padding: "40px 0",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+// ============ STYLES ============
+
+const main: React.CSSProperties = {
+	backgroundColor: "#0a0a0a",
+	fontFamily:
+		'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+	padding: "40px 16px",
 };
 
-const wrapper = {
-  width: "100%",
-  maxWidth: "100%",
-  margin: "0 auto",
-  backgroundColor: "#211f22",
+const container: React.CSSProperties = {
+	maxWidth: "520px",
+	margin: "0 auto",
+	backgroundColor: "#141414",
+	borderRadius: "16px",
+	overflow: "hidden",
+	border: "1px solid #262626",
 };
 
-const header = {
-  background: "linear-gradient(135deg, #211f22 0%, #2d2b2e 100%)",
-  padding: "50px 20px",
-  textAlign: "center" as const,
-  borderBottom: "2px solid rgba(182, 255, 0, 0.2)",
+const header: React.CSSProperties = {
+	backgroundColor: "#1a1a1a",
+	padding: "40px 32px 32px",
+	textAlign: "center",
+	borderBottom: "1px solid #262626",
 };
 
-const logoContainer = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "8px",
-  marginBottom: "30px",
+const logo: React.CSSProperties = {
+	borderRadius: "8px",
 };
 
-const logo = {
-  display: "block",
-  width: "40px",
-  height: "40px",
+const brandText: React.CSSProperties = {
+	fontSize: "22px",
+	fontWeight: 700,
+	margin: "0",
+	letterSpacing: "-0.5px",
 };
 
-const brandText = {
-  fontSize: "28px",
-  fontWeight: "bold",
-  color: "#ffffff",
-  margin: "0",
-  display: "inline",
+const brandAccent: React.CSSProperties = {
+	color: "#b6ff00",
 };
 
-const brandAccent = {
-  color: "#b6ff00",
+const brandWhite: React.CSSProperties = {
+	color: "#ffffff",
 };
 
-const h1 = {
-  fontSize: "36px",
-  fontWeight: "bold",
-  color: "#ffffff",
-  margin: "0 0 15px 0",
-  lineHeight: "1.2",
+const h1: React.CSSProperties = {
+	fontSize: "28px",
+	fontWeight: 700,
+	color: "#ffffff",
+	margin: "0 0 8px 0",
+	lineHeight: "1.3",
+	letterSpacing: "-0.5px",
 };
 
-const headerSubtext = {
-  fontSize: "18px",
-  color: "#b3b3b3",
-  margin: "0",
-  maxWidth: "600px",
-  marginLeft: "auto",
-  marginRight: "auto",
+const headerSubtext: React.CSSProperties = {
+	fontSize: "15px",
+	color: "#888888",
+	margin: "0",
+	lineHeight: "1.5",
 };
 
-const mainContent = {
-  padding: "60px 20px",
-  backgroundColor: "#211f22",
+const mainContent: React.CSSProperties = {
+	padding: "32px",
+	backgroundColor: "#141414",
 };
 
-const contentWrapper = {
-  maxWidth: "700px",
-  margin: "0 auto",
+const welcomeText: React.CSSProperties = {
+	fontSize: "15px",
+	color: "#cccccc",
+	lineHeight: "1.7",
+	margin: "0 0 28px 0",
+	textAlign: "center",
 };
 
-const welcomeCard = {
-  backgroundColor: "#2d2b2e",
-  borderRadius: "12px",
-  padding: "40px",
-  marginBottom: "30px",
-  border: "1px solid rgba(182, 255, 0, 0.15)",
+const brandHighlight: React.CSSProperties = {
+	color: "#b6ff00",
 };
 
-const welcomeText = {
-  fontSize: "18px",
-  color: "#f5f5f5",
-  lineHeight: "1.8",
-  margin: "0 0 30px 0",
-  textAlign: "center" as const,
+const buttonSection: React.CSSProperties = {
+	textAlign: "center",
+	margin: "0 0 24px 0",
 };
 
-const brandHighlight = {
-  color: "#b6ff00",
-  fontWeight: "600",
+const ctaButton: React.CSSProperties = {
+	backgroundColor: "#b6ff00",
+	color: "#000000",
+	fontSize: "15px",
+	fontWeight: 600,
+	padding: "14px 32px",
+	borderRadius: "10px",
+	textDecoration: "none",
+	display: "inline-block",
+	letterSpacing: "0.3px",
 };
 
-const buttonContainer = {
-  textAlign: "center" as const,
-  margin: "40px 0",
+const expiryText: React.CSSProperties = {
+	fontSize: "13px",
+	color: "#888888",
+	textAlign: "center",
+	margin: "0 0 24px 0",
 };
 
-const button = {
-  display: "inline-block",
-  backgroundColor: "#b6ff00",
-  color: "#211f22",
-  fontSize: "18px",
-  fontWeight: "700",
-  padding: "18px 50px",
-  borderRadius: "12px",
-  textDecoration: "none",
-  boxShadow: "0 6px 20px rgba(182, 255, 0, 0.4)",
-  letterSpacing: "0.5px",
+const divider: React.CSSProperties = {
+	borderColor: "#262626",
+	borderWidth: "1px",
+	margin: "24px 0",
 };
 
-const expiryText = {
-  fontSize: "15px",
-  color: "#b3b3b3",
-  lineHeight: "1.6",
-  margin: "30px 0 0 0",
-  textAlign: "center" as const,
+const altLinkLabel: React.CSSProperties = {
+	fontSize: "13px",
+	color: "#666666",
+	margin: "0 0 12px 0",
+	textAlign: "center",
 };
 
-const alternativeCard = {
-  backgroundColor: "#2d2b2e",
-  borderRadius: "12px",
-  padding: "25px 30px",
-  border: "1px solid rgba(181, 156, 251, 0.15)",
-  marginBottom: "30px",
+const linkBox: React.CSSProperties = {
+	backgroundColor: "#1a1a1a",
+	padding: "14px 16px",
+	borderRadius: "8px",
+	border: "1px solid #262626",
+	textAlign: "center",
 };
 
-const alternativeLabel = {
-  fontSize: "14px",
-  color: "#b3b3b3",
-  margin: "0 0 12px 0",
-  fontWeight: "600",
+const altLink: React.CSSProperties = {
+	color: "#b6ff00",
+	fontSize: "12px",
+	textDecoration: "none",
+	wordBreak: "break-all",
 };
 
-const linkContainer = {
-  backgroundColor: "#211f22",
-  padding: "15px",
-  borderRadius: "8px",
-  border: "1px solid rgba(182, 255, 0, 0.2)",
-  wordBreak: "break-all" as const,
+const featuresSection: React.CSSProperties = {
+	padding: "0 32px 32px",
+	backgroundColor: "#141414",
 };
 
-const alternativeLink = {
-  color: "#b6ff00",
-  fontSize: "13px",
-  textDecoration: "none",
+const featuresTitle: React.CSSProperties = {
+	fontSize: "14px",
+	fontWeight: 600,
+	color: "#ffffff",
+	textAlign: "center",
+	margin: "0 0 20px 0",
+	textTransform: "uppercase",
+	letterSpacing: "1px",
 };
 
-const featuresCard = {
-  padding: "35px",
-  backgroundColor: "rgba(45, 43, 46, 0.5)",
-  borderRadius: "12px",
-  border: "1px solid rgba(182, 255, 0, 0.1)",
+const featureRow: React.CSSProperties = {
+	marginBottom: "12px",
 };
 
-const h2 = {
-  fontSize: "22px",
-  color: "#ffffff",
-  margin: "0 0 25px 0",
-  fontWeight: "600",
-  textAlign: "center" as const,
+const featureColumn: React.CSSProperties = {
+	width: "50%",
+	padding: "0 6px",
+	verticalAlign: "top",
 };
 
-const featuresGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, 1fr)",
-  gap: "20px",
-  maxWidth: "600px",
-  margin: "0 auto",
+const featureIconCell: React.CSSProperties = {
+	width: "32px",
+	fontSize: "18px",
+	verticalAlign: "top",
+	paddingTop: "2px",
 };
 
-const featureItem = {
-  display: "flex",
-  alignItems: "center",
-  gap: "12px",
-  backgroundColor: "#2d2b2e",
-  padding: "15px",
-  borderRadius: "8px",
-  border: "1px solid rgba(182, 255, 0, 0.1)",
+const featureTextCell: React.CSSProperties = {
+	fontSize: "12px",
+	color: "#999999",
+	lineHeight: "1.5",
+	verticalAlign: "top",
 };
 
-const featureIcon = {
-  fontSize: "24px",
-  flexShrink: 0,
-  margin: "0",
+const footer: React.CSSProperties = {
+	backgroundColor: "#1a1a1a",
+	padding: "24px 32px",
+	textAlign: "center",
+	borderTop: "1px solid #262626",
 };
 
-const featureText = {
-  fontSize: "14px",
-  color: "#f5f5f5",
-  lineHeight: "1.4",
-  margin: "0",
+const footerNote: React.CSSProperties = {
+	fontSize: "12px",
+	color: "#666666",
+	margin: "0 0 16px 0",
 };
 
-const footer = {
-  backgroundColor: "#2d2b2e",
-  padding: "40px 20px",
-  textAlign: "center" as const,
-  borderTop: "1px solid rgba(182, 255, 0, 0.1)",
+const footerDivider: React.CSSProperties = {
+	borderColor: "#262626",
+	borderWidth: "1px",
+	margin: "16px 0",
 };
 
-const footerText = {
-  fontSize: "14px",
-  color: "#b3b3b3",
-  margin: "0 0 20px 0",
-  lineHeight: "1.6",
+const copyright: React.CSSProperties = {
+	fontSize: "11px",
+	color: "#4a4a4a",
+	margin: "0 0 16px 0",
 };
 
-const copyright = {
-  fontSize: "13px",
-  color: "#666666",
-  margin: "0 0 20px 0",
-};
-
-const footerLinks = {
-  display: "flex",
-  justifyContent: "center",
-  gap: "10px",
-  flexWrap: "wrap" as const,
-  marginTop: "20px",
-};
-
-const footerLink = {
-  fontSize: "13px",
-  color: "#b59cfb",
-  textDecoration: "none",
-};
-
-const footerSeparator = {
-  fontSize: "13px",
-  color: "#666666",
-  margin: "0 5px",
-};
-
-const disclaimer = {
-  maxWidth: "600px",
-  margin: "30px auto 0",
-  padding: "0 20px",
-  textAlign: "center" as const,
-};
-
-const disclaimerText = {
-  fontSize: "11px",
-  color: "#666666",
-  margin: "0",
+const footerLink: React.CSSProperties = {
+	fontSize: "11px",
+	color: "#888888",
+	textDecoration: "none",
 };

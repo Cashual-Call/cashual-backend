@@ -4,98 +4,98 @@ import { generateToken } from "../middleware/socket.middleware";
 import { verifyUserId } from "../utils/user-id";
 
 export class SearchController {
-  private matchService: MatchService;
+	private matchService: MatchService;
 
-  constructor(searchType: string) {
-    this.matchService = new MatchService(searchType);
+	constructor(searchType: string) {
+		this.matchService = new MatchService(searchType);
 
-    this.startSearch = this.startSearch.bind(this);
-    this.stopSearch = this.stopSearch.bind(this);
-    this.getMatch = this.getMatch.bind(this);
-    this.heartbeat = this.heartbeat.bind(this);
-    this.createPublicRoom = this.createPublicRoom.bind(this);
-  }
+		this.startSearch = this.startSearch.bind(this);
+		this.stopSearch = this.stopSearch.bind(this);
+		this.getMatch = this.getMatch.bind(this);
+		this.heartbeat = this.heartbeat.bind(this);
+		this.createPublicRoom = this.createPublicRoom.bind(this);
+	}
 
-  async startSearch(req: Request, res: Response) {
-    const { userId } = req.params;
+	async startSearch(req: Request, res: Response) {
+		const { userId } = req.params;
 
-    const result = await this.matchService.addUser(
-      userId,
-      req.user?.username || "",
-      []
-    );
+		const result = await this.matchService.addUser(
+			userId,
+			req.user?.username || "",
+			[],
+		);
 
-    res.status(200).json({ message: "Search started", data: { user: result } });
-    return;
-  }
+		res.status(200).json({ message: "Search started", data: { user: result } });
+		return;
+	}
 
-  async stopSearch(req: Request, res: Response) {
-    const { userId } = req.params;
+	async stopSearch(req: Request, res: Response) {
+		const { userId } = req.params;
 
-    if (!userId) {
-      throw new Error("User ID is required");
-    }
+		if (!userId) {
+			throw new Error("User ID is required");
+		}
 
-    await this.matchService.removeUser(userId);
+		await this.matchService.removeUser(userId);
 
-    res.status(200).json({ message: "Search stopped" });
-    return;
-  }
+		res.status(200).json({ message: "Search stopped" });
+		return;
+	}
 
-  async getMatch(req: Request, res: Response) {
-    const { userId } = req.params;
+	async getMatch(req: Request, res: Response) {
+		const { userId } = req.params;
 
-    if (!userId) {
-      throw new Error("User ID is required");
-    }
+		if (!userId) {
+			throw new Error("User ID is required");
+		}
 
-    const match = await this.matchService.getMatchedJWT(userId);
+		const match = await this.matchService.getMatchedJWT(userId);
 
-    if (!match) {
-      return res.status(404).json({ message: "No match found" });
-    }
+		if (!match) {
+			return res.status(404).json({ message: "No match found" });
+		}
 
-    res.status(200).json({ data: match, message: "Match found" });
-    return;
-  }
+		res.status(200).json({ data: match, message: "Match found" });
+		return;
+	}
 
-  async heartbeat(req: Request, res: Response) {
-    const { userId } = req.params;
+	async heartbeat(req: Request, res: Response) {
+		const { userId } = req.params;
 
-    if (!userId) {
-      throw new Error("User ID is required");
-    }
+		if (!userId) {
+			throw new Error("User ID is required");
+		}
 
-    const user = await verifyUserId(userId);
+		const user = await verifyUserId(userId);
 
-    if (!user) {
-      throw new Error("User is Not Validated");
-    }
+		if (!user) {
+			throw new Error("User is Not Validated");
+		}
 
-    await this.matchService.updateUserHeartbeat(userId);
+		await this.matchService.updateUserHeartbeat(userId);
 
-    res.status(200).json({ message: "Heartbeat updated" });
-    return;
-  }
+		res.status(200).json({ message: "Heartbeat updated" });
+		return;
+	}
 
-  async createPublicRoom(req: Request, res: Response) {
-    const jwt = generateToken({
-      senderId: req.user?.username || req.user?.name || "",
-      receiverId: "public-room",
-      roomId: "general",
-    });
+	async createPublicRoom(req: Request, res: Response) {
+		const jwt = generateToken({
+			senderId: req.user?.username || req.user?.name || "",
+			receiverId: "public-room",
+			roomId: "general",
+		});
 
-    res.status(200).json({
-      message: "Public room Token created",
-      data: {
-        jwt,
-        data: {
-          senderId: req.user?.username || req.user?.name || "",
-          receiverId: "public-room",
-          roomId: "general",
-        },
-      },
-    });
-    return;
-  }
+		res.status(200).json({
+			message: "Public room Token created",
+			data: {
+				jwt,
+				data: {
+					senderId: req.user?.username || req.user?.name || "",
+					receiverId: "public-room",
+					roomId: "general",
+				},
+			},
+		});
+		return;
+	}
 }

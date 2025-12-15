@@ -1,13 +1,13 @@
 export enum SearchEvent {
-  CONNECT = "connect",
-  DISCONNECT = "disconnect",
-  
-  START_SEARCH = "start_search",
-  STOP_SEARCH = "stop_search",
+	CONNECT = "connect",
+	DISCONNECT = "disconnect",
 
-  SEARCH = "search",
-  MATCH_FOUND = "match_found",
+	START_SEARCH = "start_search",
+	STOP_SEARCH = "stop_search",
 
-  SEARCHING = "searching",
-  ERROR = "error",
+	SEARCH = "search",
+	MATCH_FOUND = "match_found",
+
+	SEARCHING = "searching",
+	ERROR = "error",
 }

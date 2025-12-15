@@ -6,6 +6,9 @@ const router = Router();
 
 const uploadController = new UploadController();
 
-router.get("/presigned-url", uploadController.getPresignedUrl as RequestHandler);
+router.get(
+	"/presigned-url",
+	uploadController.getPresignedUrl as RequestHandler,
+);
 
 export default router;
