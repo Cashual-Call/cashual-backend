@@ -52,7 +52,7 @@ export class SearchController {
 		const match = await this.matchService.getMatchedJWT(userId);
 
 		if (!match) {
-			return res.status(404).json({ message: "No match found" });
+			return res.status(404).json({ message: "NO_MATCH_FOUND" });
 		}
 
 		res.status(200).json({ data: match, message: "Match found" });
@@ -79,21 +79,19 @@ export class SearchController {
 	}
 
 	async createPublicRoom(req: Request, res: Response) {
-		const jwt = generateToken({
+		const data = {
 			senderId: req.user?.username || req.user?.name || "",
 			receiverId: "public-room",
 			roomId: "general",
-		});
+		}
+		console.log("generating token for public room", data);
+		const jwt = generateToken(data);
 
 		res.status(200).json({
 			message: "Public room Token created",
 			data: {
 				jwt,
-				data: {
-					senderId: req.user?.username || req.user?.name || "",
-					receiverId: "public-room",
-					roomId: "general",
-				},
+				data
 			},
 		});
 		return;
