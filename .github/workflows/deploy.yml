@@ -40,8 +40,8 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github_actions
+          chmod 600 ~/.ssh/github_actions
           ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
 
       # 7. Deploy
@@ -56,5 +56,10 @@ jobs:
       # 8. Reload app (WebSocket safe)
       - name: Reload app
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} \
-          "cd /var/www/app && pm2 reload ecosystem.config.js"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} "
+            source ~/.bashrc
+            cd /var/www/app &&
+            bun install --production &&
+            pm2 reload ecosystem.config.js
+          "
+    
