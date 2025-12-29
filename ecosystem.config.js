@@ -1,6 +1,6 @@
 module.exports = {
     apps: [{
-      name: "api",
+      name: "cashual-backend",
       script: "dist/index.js",
       instances: "max",
       exec_mode: "cluster",
