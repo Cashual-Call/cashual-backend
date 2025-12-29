@@ -42,7 +42,16 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github_actions
           chmod 600 ~/.ssh/github_actions
-          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+      
+          cat >> ~/.ssh/config <<EOF
+          Host server
+            HostName ${{ secrets.SERVER_IP }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/github_actions
+            IdentitiesOnly yes
+            StrictHostKeyChecking no
+          EOF
+    
 
       # 7. Deploy
       - name: Deploy to server
