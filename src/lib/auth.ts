@@ -2,12 +2,13 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
 import { Resend } from "resend";
-import { magicLink, username, admin, anonymous } from "better-auth/plugins";
+import { magicLink, username, admin, anonymous, apiKey } from "better-auth/plugins";
 import generateUniqueName from "../utils/unique";
 import { Email } from "./email";
 import { polar_products } from "../constants/pricing";
 import { polar, checkout, portal, webhooks } from "@polar-sh/better-auth";
 import { polarClient } from "./polar";
+import { redis } from "./redis";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -35,6 +36,14 @@ export const auth = betterAuth({
 	emailAndPassword: {
 		enabled: false,
 	},
+	secondaryStorage: {
+        get: async (key) => await redis.get(key),
+        set: async (key, value) => await redis.set(key, value, "KEEPTTL"),
+        delete: async (key) => {
+            await redis.del(key);
+            return null;
+        }
+    },
 	user: {
 		additionalFields: {
 			walletAddress: { type: "string", required: false, defaultValue: "" },
@@ -77,6 +86,7 @@ export const auth = betterAuth({
 		}),
 		username(),
 		admin(),
+		apiKey(),
 		anonymous({
 			generateName: generateUniqueName,
 			emailDomainName: "cashualcall.com",

@@ -1,5 +1,4 @@
 import jwt, { SignOptions } from "jsonwebtoken";
-import { Socket } from "socket.io";
 import { config } from "../config";
 
 const secret =

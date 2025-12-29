@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { MatchService } from "../service/match.service";
 import { generateToken } from "../middleware/socket.middleware";
 import { verifyUserId } from "../utils/user-id";
+import {auth} from "../lib/auth";
 
 export class SearchController {
 	private matchService: MatchService;
@@ -84,7 +85,6 @@ export class SearchController {
 			receiverId: "public-room",
 			roomId: "general",
 		}
-		console.log("generating token for public room", data);
 		const jwt = generateToken(data);
 
 		res.status(200).json({

@@ -1,13 +1,8 @@
 import cron, { type ScheduledTask } from "node-cron";
-import Redlock, { type Lock } from "redlock";
-import { redis } from "../lib/redis";
+import type { Lock } from "redlock";
 import { SubscriptionService } from "../service/subscription.service";
 import logger from "../config/logger";
-
-// Setup Redlock for distributed locking
-const redlock = new Redlock([redis], {
-	retryCount: 1,
-});
+import { redlock } from "../config/redlock";
 
 let scheduledTask: ScheduledTask | null = null;
 

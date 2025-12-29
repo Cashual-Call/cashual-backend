@@ -1,15 +1,9 @@
 import cron, { type ScheduledTask } from "node-cron";
-import Redlock from "redlock";
-import { redis } from "../lib/redis";
 import { RoomStateService } from "../service/room-state.service";
 import logger from "../config/logger";
+import { redlock } from "../config/redlock";
 
 const roomStateService = new RoomStateService();
-
-// Setup Redlock for distributed locking
-const redlock = new Redlock([redis as any], {
-	retryCount: 1,
-});
 
 let scheduledTask: ScheduledTask | null = null;
 

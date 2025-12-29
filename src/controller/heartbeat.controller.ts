@@ -10,7 +10,7 @@ export class HeartbeatController {
 	heartbeat = async (req: Request, res: Response) => {
 		const authHeader = req.headers.authorization;
 		const token = authHeader?.split(" ")[1] as string;
-		const { roomId, senderId, ...rest } = verifyToken(token);
+		const { roomId, senderId } = verifyToken(token);
 
 		if (!roomId) {
 			return res.status(406).json({
