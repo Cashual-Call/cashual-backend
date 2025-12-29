@@ -1,30 +1,28 @@
-# Use Node.js LTS as base image
-FROM node:22-slim AS base
+# Use Bun official image as base
+FROM oven/bun:1 AS base
 
-# Install OpenSSL
-RUN apt update && apt upgrade openssl -y
-
-# Install pnpm
-RUN npm install -g pnpm@latest
+# Install OpenSSL (if not already present, for Prisma and others)
+USER root
+RUN apt update && apt install -y openssl && apt clean
 
 # Set working directory
 WORKDIR /app
 
 # Install dependencies first for layer caching
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
 
-# Install Prisma CLI
-RUN pnpm add prisma --save-dev
+# Install Prisma CLI (devDependency)
+RUN bun add prisma@latest --dev
 
 # Copy application code
 COPY . .
 
 # Generate Prisma Client
-RUN pnpm prisma generate
+RUN bunx prisma generate
 
-# Build the application
-RUN pnpm build
+# Build the application (assumes 'build' script in package.json)
+RUN bun run build
 
-# Start the server
-CMD ["pnpm", "start"]
+# Start the server (uses the same script as before)
+CMD ["bun", "run", "start"]

@@ -1,0 +1,60 @@
+name: CI-CD
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 2. Setup Bun
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # 3. Install dependencies
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      # 4. Generate Prisma Client
+      - name: Generate Prisma Client
+        run: bunx prisma generate
+
+      # 5. Build
+      - name: Build
+        run: bun run build
+
+      # 6. Setup SSH
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+      # 7. Deploy
+      - name: Deploy to server
+        run: |
+          rsync -az --delete \
+            --exclude=node_modules \
+            --exclude=.git \
+            --exclude=.github \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:/var/www/app
+
+      # 8. Reload app (WebSocket safe)
+      - name: Reload app
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} \
+          "cd /var/www/app && pm2 reload ecosystem.config.js"
