@@ -24,7 +24,19 @@ const processHeartbeatJob = async () => {
 		} catch (err) {
 			logger.error("[HeartbeatCron] Error processing heartbeat job:", err);
 		} finally {
-			await redlock.release(lock);
+			try {
+				await lock.release();
+			} catch (releaseErr: any) {
+				// Lock may have expired or already been released
+				// Only log if it's not a quorum/expiration error
+				if (
+					releaseErr?.name !== "ExecutionError" &&
+					!releaseErr?.message?.includes("quorum")
+				) {
+					logger.error("[HeartbeatCron] Error releasing lock:", releaseErr);
+				}
+				// Silently ignore quorum errors as they typically mean the lock expired
+			}
 		}
 	} catch (lockErr) {
 		// Lock not acquired, another instance is running the job

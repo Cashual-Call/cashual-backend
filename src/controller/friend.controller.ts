@@ -83,8 +83,8 @@ export class FriendsController {
 			}
 
 			const newFriend = await this.friendsService.sendFriendRequest(
-				userId,
-				friendId,
+				req.user?.id || "",
+				friendId || "",
 			);
 
 			res.status(201).json({
@@ -262,7 +262,7 @@ export class FriendsController {
 				return;
 			}
 
-			const areFriends = await this.friendsService.areFriends(userId, friendId);
+			const {areFriends, status} = await this.friendsService.areFriends(userId, friendId);
 
 			res.status(200).json({
 				success: true,
@@ -270,6 +270,7 @@ export class FriendsController {
 					areFriends,
 					userId,
 					friendId,
+					status,
 				},
 			});
 		} catch (error) {

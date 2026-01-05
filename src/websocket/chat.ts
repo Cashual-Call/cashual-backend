@@ -70,8 +70,6 @@ export function setupChatHandlers(io: Server) {
 			`New chat connection: socket=${socket.id}, room=${roomId}, sender=${senderId}, receiver=${receiverId}`,
 		);
 
-		redis.set(`chat:total-users`, io.engine.clientsCount);
-
 		const chatRecieverController = new ChatReceiverController(
 			socket,
 			roomId,
@@ -101,7 +99,6 @@ export function setupChatHandlers(io: Server) {
 		// Handle disconnection
 		socket.on(ChatEvent.DISCONNECT, () => {
 			chatRecieverController.disconnect();
-			redis.set(`chat:total-users`, io.engine.clientsCount);
 		});
 
 		// Handle user typing

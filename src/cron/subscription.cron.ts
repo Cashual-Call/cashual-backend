@@ -38,8 +38,16 @@ const processSubscriptionCheckJob = async () => {
 		if (lock) {
 			try {
 				await lock.release();
-			} catch (releaseErr) {
-				logger.error("[SubscriptionCron] Error releasing lock:", releaseErr);
+			} catch (releaseErr: any) {
+				// Lock may have expired or already been released
+				// Only log if it's not a quorum/expiration error
+				if (
+					releaseErr?.name !== "ExecutionError" &&
+					!releaseErr?.message?.includes("quorum")
+				) {
+					logger.error("[SubscriptionCron] Error releasing lock:", releaseErr);
+				}
+				// Silently ignore quorum errors as they typically mean the lock expired
 			}
 		}
 	}

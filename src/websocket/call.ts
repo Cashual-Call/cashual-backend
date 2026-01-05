@@ -245,15 +245,12 @@ export function setupCallHandlers(io: Server) {
 
 		console.log("roomIduhewrige", roomId);
 
-		redis.set(`call:total-users`, io.engine.clientsCount);
-
 		// Add user to queue automatically
 		userManager.addUser(socket, roomId);
 
 		socket.on("disconnect", async (reason) => {
 			console.log("[Call] Socket disconnected:", socket.id, "Reason:", reason);
 			await userManager.removeUser(socket.id);
-			redis.set(`call:total-users`, io.engine.clientsCount);
 		});
 
 		// Handle WebRTC signaling with room-based forwarding

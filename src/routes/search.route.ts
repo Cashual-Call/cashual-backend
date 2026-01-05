@@ -25,7 +25,6 @@ router.post(
 	"/call/heartbeat/:userId",
 	callSearchController.heartbeat as RequestHandler,
 );
-router.get("/call/:userId", callSearchController.getMatch as RequestHandler);
 
 // create public room token
 router.post(
@@ -45,7 +44,6 @@ router.post(
 	"/chat/heartbeat/:userId",
 	chatSearchController.heartbeat as RequestHandler,
 );
-router.get("/chat/:userId", chatSearchController.getMatch as RequestHandler);
 
 router.get("/", userController.searchUsers as RequestHandler);
 

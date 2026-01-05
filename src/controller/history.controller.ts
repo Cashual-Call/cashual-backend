@@ -17,15 +17,16 @@ export class HistoryController {
 	async getRooms(req: Request, res: Response) {
 		const username = req.user?.username || "";
 
-		const rooms = await prisma.room.findMany({
-			where: {
-				OR: [{ user1: { username } }, { user2: { username } }],
-			},
-			include: {
-				user1: true,
-				user2: true,
-			},
-		});
+		const rooms: any[] = [];
+		//  await prisma.room.findMany({
+		// 	where: {
+		// 		OR: [{ user1: { username } }, { user2: { username } }],
+		// 	},
+		// 	include: {
+		// 		user1: true,
+		// 		user2: true,
+		// 	},
+		// });
 
 		res.json({ data: rooms });
 	}

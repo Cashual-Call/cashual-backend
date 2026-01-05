@@ -1,12 +1,14 @@
 module.exports = {
-    apps: [{
+  apps: [
+    {
       name: "cashual-backend",
-      script: "dist/index.js",
-      instances: "max",
+      script: "src/index.ts",
+      interpreter: "bun",
       exec_mode: "cluster",
+      instances: "max",
       env: {
-        NODE_ENV: "production"
-      }
-    }]
-  }
-  
+        NODE_ENV: "production",
+      },
+    },
+  ],
+};

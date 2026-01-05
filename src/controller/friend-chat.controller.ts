@@ -2,17 +2,16 @@ import { FriendChatService } from "../service/friend-chat.service";
 import { FriendsService } from "../service/friend.service";
 import { Request, Response } from "express";
 import { NotificationService } from "../service/notification.service";
-import { NotificationType } from "@prisma/client";
+import { NotificationPriority, NotificationType } from "@prisma/client";
+import { verifyUserId } from "../utils/user-id";
 
 export class FriendChatController {
 	private friendChatService: FriendChatService;
 	private friendsService: FriendsService;
-	private notificationService: NotificationService;
 
 	constructor(searchType: "chat" | "call") {
 		this.friendChatService = new FriendChatService(searchType);
 		this.friendsService = new FriendsService();
-		this.notificationService = new NotificationService();
 	}
 
 	/*
@@ -44,18 +43,12 @@ export class FriendChatController {
 
 		// Only send notification if friend has a username (required for notification system)
 		if (friendData.friend.username) {
-			await this.notificationService.sendNotification(
-				friendData.friend.username,
-				{
-					type: NotificationType.NEW_MESSAGE,
-					title: "Started Chat with " + friendData.user.displayUsername,
-					message:
-						"You have started a chat with " + friendData.user.displayUsername,
-					data: {
-						token: token2,
-						friend: friendData.user.displayUsername,
-					},
-				},
+			await NotificationService.createNotification(
+				friendData.friend.id,
+				"Started Chat with " + friendData.user.displayUsername,
+				"You have started a chat with " + friendData.user.displayUsername,
+				NotificationType.NEW_MESSAGE,
+				NotificationPriority.NORMAL,
 			);
 		}
 

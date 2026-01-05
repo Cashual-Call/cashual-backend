@@ -2,10 +2,10 @@ import { Router, RequestHandler } from "express";
 import { UserController } from "../controller/user.controller";
 import { validateResponse } from "../middleware/validate.middleware";
 import friendRouter from "./friend.route";
-import notificationRouter from "./notification.route";
 import { verifyToken } from "../middleware/auth.middleware";
 
 const userController = new UserController();
+
 
 const router = Router();
 
@@ -30,6 +30,5 @@ router.get(
 router.use("/rankings", userController.getRankings as RequestHandler);
 
 router.use("/friends", friendRouter);
-router.use("/notifications", notificationRouter);
 
 export default router;
