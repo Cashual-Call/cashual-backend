@@ -36,31 +36,27 @@ jobs:
       - name: Build
         run: bun run build
 
-      # 6. Setup SSH
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github_actions
-          chmod 600 ~/.ssh/github_actions
-      
-          cat >> ~/.ssh/config <<EOF
-          Host server
-            HostName ${{ secrets.SERVER_IP }}
-            User ${{ secrets.SSH_USER }}
-            IdentityFile ~/.ssh/github_actions
-            IdentitiesOnly yes
-            StrictHostKeyChecking no
-          EOF
+  Deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
     
-
-      # 7. Deploy
-      - name: Deploy to server
+    steps:
+      - uses: actions/checkout@v2 
+      - name: Build & Deploy
+        env:
+            PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+            HOSTNAME: ${{secrets.SERVER_IP}}
+            USER_NAME: ${{secrets.SSH_USER}}
+      
         run: |
-          rsync -az --delete \
-            --exclude=node_modules \
-            --exclude=.git \
-            --exclude=.github \
-            ./ ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:/var/www/app
+          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME} '
+
+              # Now we have got the access of EC2 and we will start the deploy .
+              cd /var/www/app &&
+              bun install --production &&
+              pm2 reload ecosystem.config.js
+              '
 
       # 8. Reload app (WebSocket safe)
       - name: Reload app
