@@ -1,4 +1,4 @@
-import { Report } from "@prisma/client";
+import { Report } from "../generated/client";
 import { prisma } from "../lib/prisma";
 
 export class ReportService {

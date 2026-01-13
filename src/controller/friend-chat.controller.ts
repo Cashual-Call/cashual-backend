@@ -2,8 +2,8 @@ import { FriendChatService } from "../service/friend-chat.service";
 import { FriendsService } from "../service/friend.service";
 import { Request, Response } from "express";
 import { NotificationService } from "../service/notification.service";
-import { NotificationPriority, NotificationType } from "@prisma/client";
-import { verifyUserId } from "../utils/user-id";
+import { NotificationPriority, NotificationType } from "../generated/client";
+import { prisma } from "../lib/prisma";
 
 export class FriendChatController {
 	private friendChatService: FriendChatService;
@@ -23,10 +23,13 @@ export class FriendChatController {
 	startChat = async (req: Request, res: Response) => {
 		// Friend User Name
 		const { friend } = req.params;
-		const userId = req.user?.username as string;
+		const username = req.user?.id as string;
+
+		console.log("username", username);
+		console.log("friend", friend);
 
 		const friendData = await this.friendsService.areFriends(
-			userId,
+			username,
 			friend,
 			true,
 		);

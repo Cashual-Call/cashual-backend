@@ -6,7 +6,6 @@ import { verifyToken } from "../middleware/auth.middleware";
 
 const userController = new UserController();
 
-
 const router = Router();
 
 router.get("/avatars", userController.getAvailableAvatars as RequestHandler);

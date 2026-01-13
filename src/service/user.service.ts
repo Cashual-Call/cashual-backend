@@ -1,4 +1,4 @@
-import { Prisma, User } from "@prisma/client";
+import { Prisma, User } from "../generated/client";
 import { prisma } from "../lib/prisma";
 import { PointService } from "./point.service";
 

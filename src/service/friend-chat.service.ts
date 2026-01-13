@@ -1,7 +1,7 @@
 import { NotificationService } from "./notification.service";
 import { MatchService } from "./match.service";
 import { generateToken } from "../middleware/socket.middleware";
-import { User } from "@prisma/client";
+import { User } from "../generated/client";
 
 export class FriendChatService {
 	private notificationService: NotificationService;

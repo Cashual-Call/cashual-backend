@@ -2,7 +2,13 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
 import { Resend } from "resend";
-import { magicLink, username, admin, anonymous, apiKey } from "better-auth/plugins";
+import {
+	magicLink,
+	username,
+	admin,
+	anonymous,
+	apiKey,
+} from "better-auth/plugins";
 import generateUniqueName from "../utils/unique";
 import { Email } from "./email";
 import { polar_products } from "../constants/pricing";
@@ -16,6 +22,10 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
 export const auth = betterAuth({
 	trustedOrigins: [FRONTEND_URL],
+	session: {
+		expiresIn: 60 * 60 * 24 * 30,
+		updateAge: 60 * 60 * 24,
+	},
 	database: prismaAdapter(prisma, {
 		provider: "postgresql",
 	}),
@@ -37,13 +47,13 @@ export const auth = betterAuth({
 		enabled: false,
 	},
 	secondaryStorage: {
-        get: async (key) => await redis.get(key),
-        set: async (key, value) => await redis.set(key, value, "KEEPTTL"),
-        delete: async (key) => {
-            await redis.del(key);
-            return null;
-        }
-    },
+		get: async (key) => await redis.get(key),
+		set: async (key, value) => await redis.set(key, value, "KEEPTTL"),
+		delete: async (key) => {
+			await redis.del(key);
+			return null;
+		},
+	},
 	user: {
 		additionalFields: {
 			walletAddress: { type: "string", required: false, defaultValue: "" },
@@ -110,6 +120,7 @@ export const auth = betterAuth({
 						email: newUser.user.email,
 						emailVerified: newUser.user.emailVerified ?? null,
 						username: anonymousUser.user.name,
+						name: "Anonymous",
 					},
 				});
 			},

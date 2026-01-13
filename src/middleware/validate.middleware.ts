@@ -5,7 +5,7 @@ import { fromError } from "zod-validation-error";
 import {
 	PrismaClientKnownRequestError,
 	PrismaClientValidationError,
-} from "@prisma/client/runtime/library";
+} from "@prisma/client/runtime/client";
 
 export const validateResponse = (
 	_: Request,

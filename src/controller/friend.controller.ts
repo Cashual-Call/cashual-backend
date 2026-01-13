@@ -14,7 +14,7 @@ export class FriendsController {
 	 */
 	getFriendsList = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const userId = req.user?.username; // Assuming you have authentication middleware that sets req.user
+			const userId = req.user?.id;
 
 			if (!userId) {
 				res.status(401).json({
@@ -24,7 +24,7 @@ export class FriendsController {
 				return;
 			}
 
-			const allFriends = await this.friendsService.getFriendsList(userId);
+			const allFriends = await this.friendsService.getFriendsListById(userId);
 
 			// Separate friends by status
 			const accepted = allFriends.filter((f) => f.status === "accepted");
@@ -262,7 +262,10 @@ export class FriendsController {
 				return;
 			}
 
-			const {areFriends, status} = await this.friendsService.areFriends(userId, friendId);
+			const { areFriends, status } = await this.friendsService.areFriends(
+				userId,
+				friendId,
+			);
 
 			res.status(200).json({
 				success: true,
@@ -289,7 +292,7 @@ export class FriendsController {
 	 */
 	getFriendSuggestions = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const userId = req.user?.username;
+			const userId = req.user?.id;
 			const limit = parseInt(req.query.limit as string) || 10;
 
 			if (!userId) {

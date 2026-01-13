@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { redis } from "../lib/redis";
-import { RoomType } from "@prisma/client";
+import { RoomType } from "../generated/client";
 
 export default class RoomService {
 	private readonly roomType: RoomType = RoomType.CHAT;
