@@ -6,6 +6,7 @@ import { json } from "body-parser";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import { loadSSMParams } from "./lib/load-env";
 import "dotenv/config";
 import { setupWebSocketHandlers } from "./websocket";
 import { pubClient, subClient } from "./lib/redis";
@@ -25,6 +26,12 @@ import { MemoryService } from "./service/memory.service";
 import { errorHandler } from "./utils";
 import router from "./routes";
 import { instrument } from "@socket.io/admin-ui";
+
+loadSSMParams().then(() => {
+	console.log("SSM parameters loaded");
+}).catch((error) => {
+	console.error("Error loading SSM parameters:", error);
+});
 
 const app = express();
 const httpServer = createServer(app);
