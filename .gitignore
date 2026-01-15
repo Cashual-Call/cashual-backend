@@ -181,6 +181,5 @@ prisma/migrations
 keyfile.json
 
 # Lock File
-bun.lock*
 package-lock.json
 yarn.lock
