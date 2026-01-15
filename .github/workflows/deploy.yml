@@ -28,10 +28,6 @@ jobs:
       - name: Install deps
         run: bun install --frozen-lockfile
 
-      # 4. Build
-      - name: Build
-        run: bun run build
-
   Deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest

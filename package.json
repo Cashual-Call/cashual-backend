@@ -6,11 +6,11 @@
 	"license": "MIT",
 	"type": "module",
 	"scripts": {
-		"dev": "bun run src/index.ts",
+		"dev": "bun run src/index.ts --watch",
 		"lint": "biome lint .",
+		"start": "bun run src/index.ts",
 		"format": "biome format --write .",
 		"check": "biome check .",
-		"start": "node ./dist/src/index.js",
 		"db:generate": "prisma generate",
 		"db:migrate": "prisma migrate dev --name init",
 		"db:studio": "prisma studio"
