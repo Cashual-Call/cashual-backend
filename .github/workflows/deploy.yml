@@ -44,6 +44,6 @@ jobs:
             cd /var/www/app &&
             git pull origin main &&
             bun install --production &&
-            pm2 reload ecosystem.config.js
+            pm2 start --interpreter bun src/index.ts
           '
           rm -f private_key
