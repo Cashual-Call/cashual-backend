@@ -212,15 +212,28 @@ export class ChatReceiverController {
 							message.senderId,
 						);
 
-			// Add message ID to room history
-			await redis.lpush(`chat:room:${this.roomId}:messages`, messageObj.id);
-			await redis.ltrim(`chat:room:${this.roomId}:messages`, 0, 99); // Keep last 100 messages
+		// Add message ID to room history
+		await redis.lpush(`chat:room:${this.roomId}:messages`, messageObj.id);
+		await redis.ltrim(`chat:room:${this.roomId}:messages`, 0, 99); // Keep last 100 messages
 
-			// Publish message to Redis for broadcasting to all users in the room
+		// For private rooms, emit directly to the room using Socket.IO
+		// Only use Redis pub/sub for the public "general" room (for horizontal scaling)
+		if (this.roomId === "general") {
 			console.log(
 				`[ChatReceiver] Publishing message to Redis channel: ${RedisHash.CHAT_MESSAGES}`,
 			);
 			await pubClient.publish(RedisHash.CHAT_MESSAGES, JSON.stringify(message));
+		} else {
+			// For private chats, emit directly to the room
+			// Use socket.to() for other users in the room, and socket.emit() for the sender
+			console.log(
+				`[ChatReceiver] Emitting message directly to private room: ${this.roomId}`,
+			);
+			// Emit to all OTHER users in the room
+			this.socket.to(this.roomId).emit(ChatEvent.MESSAGE, message);
+			// Also emit back to the sender so they see their own message
+			this.socket.emit(ChatEvent.MESSAGE, message);
+		}
 
 			// Acknowledge message received
 			this.socket.emit(ChatEvent.MESSAGE_SENT, {

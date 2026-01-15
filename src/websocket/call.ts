@@ -233,17 +233,7 @@ export function setupCallHandlers(io: Server) {
 			receiverId,
 			senderUsername = "",
 			receiverUsername = "",
-		} = authToken
-			? verifyToken(authToken)
-			: {
-					roomId: "general",
-					senderId: socket.id, // TODO: chanage,
-					receiverId: "global",
-					senderUsername: "",
-					receiverUsername: "",
-				};
-
-		console.log("roomIduhewrige", roomId);
+		} = verifyToken(authToken)
 
 		// Add user to queue automatically
 		userManager.addUser(socket, roomId);

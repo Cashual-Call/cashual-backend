@@ -4,8 +4,6 @@ import { ChatReceiverController } from "../controller/chat/chat-reciever.control
 import { ChatEvent } from "../config/websocket";
 import { verifyToken } from "../middleware/socket.middleware";
 import { ChatEmitterController } from "../controller/chat/chat-emitter.controller";
-import { FriendsService } from "../service/friend.service";
-import { NotificationService } from "../service/notification.service";
 
 /**
  * Sets up chat handlers for a Socket.IO server with Redis adapter for horizontal scaling
@@ -31,10 +29,6 @@ export function setupChatHandlers(io: Server) {
     console.error("Redis subscription client error:", error);
   });
 
-  // Initialize friends service and notification service
-  const friendsService = new FriendsService();
-  const notificationService = new NotificationService();
-
   chatNamespace.on("connection", async (socket: Socket) => {
     const authToken = socket.handshake.auth.token;
 
@@ -44,16 +38,8 @@ export function setupChatHandlers(io: Server) {
       receiverId,
       senderUsername = "",
       receiverUsername = "",
-    } = authToken
-      ? verifyToken(authToken)
-      : {
-          // Default to "general" room - a public room where all unauthenticated users can chat
-          roomId: "general",
-          senderId: socket.id, // TODO: chanage,
-          receiverId: "global",
-          senderUsername: "",
-          receiverUsername: "",
-        };
+    } = verifyToken(authToken);
+
 
     // Validate roomId is not empty
     if (!roomId || roomId.trim() === "") {

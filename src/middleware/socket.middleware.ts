@@ -27,7 +27,17 @@ export const generateToken = (
 	return jwt.sign(obj, config.jwt.secret, options);
 };
 
-export const verifyToken = (token: string) => {
+export const verifyToken = (token?: string) => {
+	if(!token) {
+		console.log("No token provided");
+		return {
+			roomId: "general",
+			senderId: "", // TODO: chanage,
+			receiverId: "global",
+			senderUsername: "",
+			receiverUsername: "",
+		  }
+	}
 	try {
 		if (!token) {
 			throw new Error("No token provided");
