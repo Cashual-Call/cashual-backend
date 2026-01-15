@@ -28,11 +28,7 @@ jobs:
       - name: Install deps
         run: bun install --frozen-lockfile
 
-      # 4. Generate Prisma Client
-      - name: Generate Prisma Client
-        run: bunx prisma generate
-
-      # 5. Build
+      # 4. Build
       - name: Build
         run: bun run build
 
