@@ -44,6 +44,6 @@ jobs:
             cd /var/www/app &&
             git pull origin main &&
             bun install --production &&
-            pm2 start --interpreter bun src/index.ts
+            pm2 restart app || pm2 start src/index.ts --name app --interpreter bun
           '
           rm -f private_key
