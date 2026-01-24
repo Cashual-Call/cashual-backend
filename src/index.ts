@@ -61,7 +61,7 @@ Promise.all([pubClient, subClient]).then(([pub, sub]) => {
 // Middleware
 app.use(
 	cors({
-		origin: [...FRONTEND_URLs],
+		origin: ["*"], // TODO: Change to specific origins
 		credentials: true,
 	}),
 );
