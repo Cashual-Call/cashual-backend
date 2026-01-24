@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, type Request, type Response } from "express";
 
 import userRouter from "./user.route";
 import historyRouter from "./history.route";
@@ -9,9 +9,14 @@ import paymentRouter from "./payment.route";
 import reportRouter from "./report.route";
 import sseRouter from "./sse.route";
 import path from "node:path";
+import fs from "node:fs";
 import { router as bullRouter, BASE_PATH as BULL_PATH } from "./bull.route";
 
 const router = Router();
+const packageJsonPath = path.join(process.cwd(), "package.json");
+const appVersion = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")).version;
+const templatePath = path.join(process.cwd(), "src", "templates", "index.html");
+const templateHtml = fs.readFileSync(templatePath, "utf8");
 
 router.use("/api/v1/users", userRouter);
 router.use("/api/v1/search", searchRouter);
@@ -26,12 +31,16 @@ router.use("/sse", sseRouter);
 router.use(BULL_PATH, bullRouter);
 
 router.use((req: Request, res: Response) => {
+	console.log("appVersion", appVersion);
+	res.setHeader("X-App-Version", appVersion);
 	if (req.method === "GET") {
 		res
 			.status(404)
-			.sendFile(path.join(process.cwd(), "src", "templates", "index.html"));
+			.type("html")
+			.send(templateHtml.replace("{{APP_VERSION}}", appVersion));
 	} else {
 		res.status(404).json({
+			version: appVersion,
 			error: "Not Found",
 			message: "The requested resource does not exist",
 			path: req.path,
