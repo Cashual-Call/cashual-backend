@@ -32,14 +32,14 @@ const app = express();
 const httpServer = createServer(app);
 
 const PORT = process.env.PORT || 8080;
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const FRONTEND_URLs = ["http://cashualcall.com", "https://v1.cashualcall.com", "http://localhost:3000"];
 const RATE_LIMIT_WINDOW_MS =
 	Number(process.env.RATE_LIMIT_WINDOW_MS) || 5 * 60 * 1000;
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 300;
 
 const io = new Server(httpServer, {
 	cors: {
-		origin: [FRONTEND_URL, "https://admin.socket.io"],
+		origin: [...FRONTEND_URLs, "https://admin.socket.io"],
 		methods: ["GET", "POST"],
 		credentials: true,
 	},
@@ -61,7 +61,7 @@ Promise.all([pubClient, subClient]).then(([pub, sub]) => {
 // Middleware
 app.use(
 	cors({
-		origin: FRONTEND_URL,
+		origin: [...FRONTEND_URLs],
 		credentials: true,
 	}),
 );
