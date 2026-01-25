@@ -31,9 +31,9 @@ export const verifyToken = (token?: string) => {
 	if(!token) {
 		console.log("No token provided");
 		return {
-			roomId: "general",
-			senderId: "", // TODO: chanage,
-			receiverId: "global",
+			roomId: "",
+			senderId: "",
+			receiverId: "",
 			senderUsername: "",
 			receiverUsername: "",
 		  }

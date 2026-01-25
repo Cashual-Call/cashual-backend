@@ -112,7 +112,7 @@ export class NotificationService {
 				},
 			});
 
-			notifications.map((notification) => {
+			notifications.forEach((notification) => {
 				try {
 					Memory.getClient(notification.userId)?.write(notification);
 				} catch (err) {

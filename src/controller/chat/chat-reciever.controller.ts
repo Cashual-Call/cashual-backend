@@ -89,7 +89,10 @@ export class ChatReceiverController {
 			});
 
 			// Get room history if needed
-			const roomHistory = await this.chatDBService.getMessages(this.roomId);
+			const roomHistory =
+				this.roomId === "general"
+					? await this.chatDBService.getGlobalMessages()
+					: await this.chatDBService.getMessages(this.roomId);
 			if (roomHistory.length > 0) {
 				this.socket.emit("roomHistory", roomHistory);
 			}
