@@ -30,7 +30,12 @@ export class FriendsService {
 	private async resolveUser(input: string) {
 		return prisma.user.findFirst({
 			where: {
-				OR: [{ username: input }, { displayUsername: input }, { name: input }],
+				OR: [
+					{ id: input },
+					{ username: input },
+					{ displayUsername: input },
+					{ name: input },
+				],
 			},
 			select: {
 				id: true,
@@ -318,11 +323,19 @@ export class FriendsService {
 				? "pending_sent"
 				: "pending_received";
 
+		let user: User | undefined;
+		let friend: User | undefined;
+		if (includeUsers && friendship) {
+			const isRequester = friendship.userId === userId;
+			user = isRequester ? friendship.user : friendship.friend;
+			friend = isRequester ? friendship.friend : friendship.user;
+		}
+
 		const result = {
 			areFriends: true,
 			status: status,
-			user: undefined,
-			friend: undefined,
+			user,
+			friend,
 		};
 
 		// Cache only if not including users

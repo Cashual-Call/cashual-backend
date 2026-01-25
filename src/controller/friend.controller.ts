@@ -63,7 +63,7 @@ export class FriendsController {
 	 */
 	sendFriendRequest = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const userId = req.user?.username;
+			const userId = req.user?.id;
 			const { friendId } = req.params;
 
 			if (!userId) {
@@ -130,7 +130,7 @@ export class FriendsController {
 	 */
 	cancelFriendRequest = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const userId = req.user?.username;
+			const userId = req.user?.id;
 			const { friendId } = req.params;
 
 			if (!userId) {
@@ -190,7 +190,7 @@ export class FriendsController {
 	 */
 	removeFriend = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const userId = req.user?.username;
+			const userId = req.user?.id;
 			const { friendId } = req.params;
 
 			if (!userId) {
@@ -243,7 +243,7 @@ export class FriendsController {
 		res: Response,
 	): Promise<void> => {
 		try {
-			const userId = req.user?.username;
+			const userId = req.user?.id;
 			const { friendId } = req.params;
 
 			if (!userId) {
@@ -329,7 +329,7 @@ export class FriendsController {
 	 */
 	getPendingRequests = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const userId = req.user?.username;
+			const userId = req.user?.id;
 
 			if (!userId) {
 				res.status(401).json({
@@ -362,7 +362,7 @@ export class FriendsController {
 	 */
 	acceptFriendRequest = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const userId = req.user?.username;
+			const userId = req.user?.id;
 			const { friendshipId } = req.params;
 
 			if (!userId) {
@@ -413,7 +413,7 @@ export class FriendsController {
 	 */
 	rejectFriendRequest = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const userId = req.user?.username;
+			const userId = req.user?.id;
 			const { friendshipId } = req.params;
 
 			if (!userId) {

@@ -39,7 +39,7 @@ export class FriendChatController {
 				.json({ message: "Not a friend or user not found" });
 		}
 
-		const { token1, token2 } = await this.friendChatService.startChat(
+		const { token1, token2, roomId } = await this.friendChatService.startChat(
 			friendData.user,
 			friendData.friend,
 		);
@@ -55,6 +55,9 @@ export class FriendChatController {
 			);
 		}
 
-		res.status(200).json({ message: "Chat started", data: { token: token1 } });
+		res.status(200).json({
+			message: "Chat started",
+			data: { token: token1, roomId },
+		});
 	};
 }
