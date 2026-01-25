@@ -1,4 +1,5 @@
 import express from "express";
+import type { Request } from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
@@ -80,7 +81,14 @@ app.use(
 	}),
 );
 app.all("/api/auth/*splat", toNodeHandler(auth));
-app.use(json());
+app.use(
+	json({
+		verify: (req, _res, buf) => {
+			const request = req as Request;
+			request.rawBody = buf.toString("utf8");
+		},
+	}),
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(errorHandler);
 

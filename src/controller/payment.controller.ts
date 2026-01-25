@@ -4,7 +4,6 @@ import {
 	paymentSuccessSchema,
 	paymentErrorSchema,
 	helioWebhookSchema,
-	stripePaymentIntentSchema,
 } from "../validation/payment.validation";
 import { addDays, addMonths, addYears } from "date-fns";
 import { Webhook } from "standardwebhooks";
@@ -38,6 +37,24 @@ function mapPlanType(
 		return "MONTHLY";
 	}
 	return "YEARLY";
+}
+
+function getHelioWebhookHeaders(
+	req: Request,
+): { "webhook-id": string; "webhook-timestamp": string; "webhook-signature": string } | null {
+	const webhookId = req.header("webhook-id");
+	const webhookTimestamp = req.header("webhook-timestamp");
+	const webhookSignature = req.header("webhook-signature");
+
+	if (!webhookId || !webhookTimestamp || !webhookSignature) {
+		return null;
+	}
+
+	return {
+		"webhook-id": webhookId,
+		"webhook-timestamp": webhookTimestamp,
+		"webhook-signature": webhookSignature,
+	};
 }
 
 export class PaymentController {
@@ -178,6 +195,38 @@ export class PaymentController {
 	 */
 	static async handleHelioWebhook(req: Request, res: Response): Promise<void> {
 		try {
+			const webhookSecret = process.env.HELIO_WEBHOOK_SECRET;
+			if (!webhookSecret) {
+				console.error("HELIO_WEBHOOK_SECRET is not configured");
+				res.status(500).json({
+					success: false,
+					message: "Webhook verification not configured",
+				});
+				return;
+			}
+
+			const headers = getHelioWebhookHeaders(req);
+			if (!headers) {
+				res.status(400).json({
+					success: false,
+					message: "Missing webhook headers",
+				});
+				return;
+			}
+
+			const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
+			const webhook = new Webhook(webhookSecret);
+			try {
+				webhook.verify(rawBody, headers);
+			} catch (verifyError) {
+				console.error("Helio webhook signature verification failed:", verifyError);
+				res.status(401).json({
+					success: false,
+					message: "Invalid webhook signature",
+				});
+				return;
+			}
+
 			// Validate webhook payload
 			const validatedData = helioWebhookSchema.parse(req.body);
 
