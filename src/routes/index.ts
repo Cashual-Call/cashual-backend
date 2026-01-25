@@ -8,6 +8,7 @@ import heartbeatRouter from "./heartbeat.route";
 import paymentRouter from "./payment.route";
 import reportRouter from "./report.route";
 import sseRouter from "./sse.route";
+import ratingRouter from "./rating.route";
 import path from "node:path";
 import fs from "node:fs";
 import { router as bullRouter, BASE_PATH as BULL_PATH } from "./bull.route";
@@ -25,6 +26,7 @@ router.use("/api/v1/upload", uploadRouter);
 router.use("/api/v1/heartbeat", heartbeatRouter);
 router.use("/api/v1/payment", paymentRouter);
 router.use("/api/v1/reports", reportRouter);
+router.use("/api/v1/ratings", ratingRouter);
 router.use("/sse", sseRouter);
 
 // Bull Router Path

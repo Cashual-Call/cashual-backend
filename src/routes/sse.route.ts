@@ -2,7 +2,6 @@ import { Router, Response } from "express";
 import { verifyToken } from "../middleware/auth.middleware";
 import { MemoryService as Memory } from "../service/memory.service";
 import { NotificationService } from "../service/notification.service";
-import { pubClient, subClient } from "../lib/redis";
 
 const router = Router();
 
