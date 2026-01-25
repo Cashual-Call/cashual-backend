@@ -16,6 +16,7 @@ export class ChatReceiverController {
 	private roomId: string;
 	private senderId: string;
 	private receiverId: string;
+	private static readonly PENDING_DISCONNECT_TTL_MS = 15000;
 
 	constructor(
 		socket: Socket,
@@ -65,9 +66,15 @@ export class ChatReceiverController {
 			// Add room to socket's room list
 			await redis.sadd(`chat:socket:${this.socket.id}:rooms`, this.roomId);
 
-			// Publish join event
+			const pendingDisconnectKey = this.getPendingDisconnectKey(this.roomId);
+			const wasPendingDisconnect = await redis.exists(pendingDisconnectKey);
+			if (wasPendingDisconnect) {
+				await redis.del(pendingDisconnectKey);
+			}
+
+			// Publish join/connected event
 			const joinEvent: RoomEvent = {
-				type: "join",
+				type: wasPendingDisconnect ? "connected" : "join",
 				roomId: this.roomId,
 				clientId: this.socket.id,
 				username: this.senderId,
@@ -260,19 +267,49 @@ export class ChatReceiverController {
 				// Remove socket from room
 				await redis.srem(`chat:rooms:${roomId}`, this.socket.id);
 
-				// Publish leave event
-				const leaveEvent: RoomEvent = {
-					type: "leave",
-					roomId,
-					clientId: this.socket.id,
-					username: this.senderId,
-					timestamp: new Date().toISOString(),
-				};
+				const pendingKey = this.getPendingDisconnectKey(roomId);
+				await redis.set(
+					pendingKey,
+					this.socket.id,
+					"PX",
+					ChatReceiverController.PENDING_DISCONNECT_TTL_MS,
+				);
 
+				// Publish disconnected event immediately
 				await pubClient.publish(
 					RedisHash.CHAT_ROOMS,
-					JSON.stringify(leaveEvent),
+					JSON.stringify({
+						type: "disconnected",
+						roomId,
+						clientId: this.socket.id,
+						username: this.senderId,
+						timestamp: new Date().toISOString(),
+					}),
 				);
+
+				// Delay leave event to allow reconnection
+				setTimeout(async () => {
+					try {
+						const stillPending = await redis.get(pendingKey);
+						if (!stillPending) return;
+
+						const leaveEvent: RoomEvent = {
+							type: "leave",
+							roomId,
+							clientId: this.socket.id,
+							username: this.senderId,
+							timestamp: new Date().toISOString(),
+						};
+
+						await pubClient.publish(
+							RedisHash.CHAT_ROOMS,
+							JSON.stringify(leaveEvent),
+						);
+						await redis.del(pendingKey);
+					} catch (error) {
+						console.error("Error finalizing disconnect leave:", error);
+					}
+				}, ChatReceiverController.PENDING_DISCONNECT_TTL_MS);
 			}
 
 			// Clean up socket data
@@ -281,6 +318,10 @@ export class ChatReceiverController {
 		} catch (error) {
 			console.error("Error handling disconnect:", error);
 		}
+	}
+
+	private getPendingDisconnectKey(roomId: string) {
+		return `chat:pending_disconnect:${roomId}:${this.senderId}`;
 	}
 
 	async userTyping() {

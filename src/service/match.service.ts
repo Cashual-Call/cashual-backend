@@ -22,10 +22,6 @@ const setUserToPreventMatch = async (userId: string) => {
 	await redis.set(`user_prevent_match:${userId}`, "true", "EX", 7);
 };
 
-const checkPrevent = async (userId: string): Promise<string | null> => {
-	return await redis.get(`user_prevent_match:${userId}`);
-};
-
 export class MatchService {
 	private searchType: string;
 	public availableUserService: AvailableUserService;
@@ -41,6 +37,10 @@ export class MatchService {
 		);
 		this.roomStateService = new RoomStateService();
 		this.friendService = new FriendsService();
+	}
+
+	private async checkPrevent(userId: string): Promise<string | null> {
+		return await redis.get(`user_prevent_match:${userId}`);
 	}
 
 	async addUser(userId: string, username: string, interests: string[]) {
@@ -250,8 +250,8 @@ export class MatchService {
 				continue;
 			}
 
-			const prevent1 = await checkPrevent(pair.user1Id);
-			const prevent2 = await checkPrevent(pair.user2Id);
+			const prevent1 = await this.checkPrevent(pair.user1Id);
+			const prevent2 = await this.checkPrevent(pair.user2Id);
 
 			if (prevent1 || prevent2) {
 				continue;
@@ -288,8 +288,8 @@ export class MatchService {
 			const user1 = unmatchedUsers.shift()!;
 			const user2 = unmatchedUsers.shift()!;
 
-			const prevent1 = await checkPrevent(user1.userId);
-			const prevent2 = await checkPrevent(user2.userId);
+			const prevent1 = await this.checkPrevent(user1.userId);
+			const prevent2 = await this.checkPrevent(user2.userId);
 
 			if (prevent1 || prevent2) {
 				console.log(
