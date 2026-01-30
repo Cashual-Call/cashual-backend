@@ -181,6 +181,9 @@ export class FriendsService {
 					`You are now friends with ${user.username}`,
 					NotificationType.FRIEND_ACCEPTED,
 					NotificationPriority.NORMAL,
+					{
+						...accepted
+					}
 				);
 				await NotificationService.createNotification(
 					user.id,
@@ -188,6 +191,9 @@ export class FriendsService {
 					`You are now friends with ${friend.username}`,
 					NotificationType.FRIEND_ACCEPTED,
 					NotificationPriority.NORMAL,
+					{
+						...accepted
+					}
 				);
 
 				// Invalidate caches for both users
@@ -225,6 +231,9 @@ export class FriendsService {
 			`You have a new friend request from ${user.username || user.id || "Unknown"}`,
 			NotificationType.FRIEND_REQUEST,
 			NotificationPriority.NORMAL,
+			{
+				...friendship
+			}
 		);
 
 		// Invalidate caches for both users
