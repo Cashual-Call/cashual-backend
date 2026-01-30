@@ -21,22 +21,42 @@ export class FriendChatController {
 	 * send a notification to the other user
 	 */
 	startChat = async (req: Request, res: Response) => {
-		// Friend User Name
 		const { friend } = req.params;
-		const username = req.user?.id as string;
+		const userId = req.user?.id as string;
 
-		console.log("username", username);
-		console.log("friend", friend);
+		if (!userId) {
+			return res.status(401).json({ message: "Unauthorized" });
+		}
+
+		const friendUser = await prisma.user.findFirst({
+			where: {
+				OR: [
+					{ id: friend },
+					{ username: friend },
+					{ displayUsername: friend },
+				],
+			},
+		});
+
+		if (!friendUser) {
+			return res.status(404).json({ message: "User not found" });
+		}
 
 		const friendData = await this.friendsService.areFriends(
-			username,
-			friend,
+			userId,
+			friendUser.id,
 			true,
 		);
-		if (!friendData.areFriends || !friendData.user || !friendData.friend) {
+
+		if (
+			!friendData.areFriends ||
+			friendData.status !== "accepted" ||
+			!friendData.user ||
+			!friendData.friend
+		) {
 			return res
-				.status(400)
-				.json({ message: "Not a friend or user not found" });
+				.status(403)
+				.json({ message: "Friendship not accepted" });
 		}
 
 		const { token1, token2, roomId } = await this.friendChatService.startChat(
