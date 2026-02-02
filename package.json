@@ -1,12 +1,12 @@
 {
 	"name": "cashual-chat-backend",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"main": "index.ts",
 	"author": "Arup Basak <email.arupbasak@gmail.com>",
 	"license": "MIT",
 	"type": "module",
 	"scripts": {
-		"dev": "bun run src/index.ts --watch",
+		"dev": "bun run  --hot src/index.ts",
 		"lint": "biome lint .",
 		"start": "bun run src/index.ts",
 		"format": "biome format --write .",
