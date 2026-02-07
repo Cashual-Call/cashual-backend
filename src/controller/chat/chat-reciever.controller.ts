@@ -6,6 +6,9 @@ import ChatDBService from "../../service/chat-db.service";
 import { RoomStateService } from "../../service/room-state.service";
 import { RedisHash } from "../../config/redis-hash";
 import { FriendsService } from "../../service/friend.service";
+import { NotificationService } from "../../service/notification.service";
+import { NotificationPriority, NotificationType } from "../../generated/client";
+import { prisma } from "../../lib/prisma";
 
 export class ChatReceiverController {
 	private chatDBService: ChatDBService;
@@ -187,8 +190,25 @@ export class ChatReceiverController {
 			//   return;
 			// }
 
+			// "general" is a special public room where all users can chat
+			// For general room, we store messages as global (no receiver needed)
+			// For all other rooms, we store the full sender-receiver relationship
+			const messageObj =
+				this.roomId !== "general"
+					? await this.chatDBService.addMessage(
+							validatedData.content,
+							chatData.senderId,
+							chatData.receiverId,
+							this.roomId,
+						)
+					: await this.chatDBService.addGlobalMessage(
+							validatedData.content,
+							chatData.senderId,
+						);
+
 			// Create the complete message object - use this.roomId as source of truth
 			const message: Message = {
+				id: messageObj.id,
 				content: validatedData.content,
 				senderId: chatData.senderId,
 				receiverId: chatData.receiverId,
@@ -205,22 +225,6 @@ export class ChatReceiverController {
 				`[ChatReceiver] Processing message from ${this.senderId} in room ${this.roomId}`,
 				{ content: message.content, type: message.type },
 			);
-
-			// "general" is a special public room where all users can chat
-			// For general room, we store messages as global (no receiver needed)
-			// For all other rooms, we store the full sender-receiver relationship
-			const messageObj =
-				this.roomId !== "general"
-					? await this.chatDBService.addMessage(
-							message.content,
-							message.senderId,
-							message.receiverId,
-							message.roomId,
-						)
-					: await this.chatDBService.addGlobalMessage(
-							message.content,
-							message.senderId,
-						);
 
 		// Add message ID to room history
 		await redis.lpush(`chat:room:${this.roomId}:messages`, messageObj.id);
@@ -244,6 +248,54 @@ export class ChatReceiverController {
 			// Also emit back to the sender so they see their own message
 			this.socket.emit(ChatEvent.MESSAGE, message);
 		}
+
+			if (this.roomId !== "general" && chatData.receiverId) {
+				try {
+					const receiverUser = await prisma.user.findFirst({
+						where: {
+							OR: [
+								{ id: chatData.receiverId },
+								{ username: chatData.receiverId },
+								{ displayUsername: chatData.receiverId },
+							],
+						},
+					});
+					const senderUser = await prisma.user.findFirst({
+						where: {
+							OR: [
+								{ id: chatData.senderId },
+								{ username: chatData.senderId },
+								{ displayUsername: chatData.senderId },
+							],
+						},
+					});
+
+					if (receiverUser && receiverUser.id !== senderUser?.id) {
+						const senderName =
+							senderUser?.displayUsername ||
+							senderUser?.username ||
+							senderUser?.name ||
+							chatData.senderId;
+
+						await NotificationService.createNotification(
+							receiverUser.id,
+							`New message from ${senderName}`,
+							message.content,
+							NotificationType.NEW_MESSAGE,
+							NotificationPriority.NORMAL,
+							{
+								roomId: this.roomId,
+								senderId: senderUser?.id || chatData.senderId,
+								senderUsername: senderName,
+								messagePreview: message.content,
+								user: senderUser,
+							},
+						);
+					}
+				} catch (error) {
+					console.error("Failed to create message notification:", error);
+				}
+			}
 
 			// Acknowledge message received
 			this.socket.emit(ChatEvent.MESSAGE_SENT, {
@@ -492,7 +544,8 @@ export class ChatReceiverController {
 	async userEvent(data: { eventType: string; payload?: any }) {
 		try {
 			const event = {
-				type: data.eventType,
+				eventType: data.eventType,
+				type: "user_event",
 				userId: this.senderId,
 				username: this.senderId,
 				roomId: this.roomId,

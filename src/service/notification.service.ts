@@ -114,7 +114,7 @@ export class NotificationService {
 
 			notifications.forEach((notification) => {
 				try {
-					Memory.getClient(notification.userId)?.write(notification);
+					this.sendNotification(notification);
 				} catch (err) {
 					logger.error(
 						`Error sending unsent notification to user ${notification.userId}:`,

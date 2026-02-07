@@ -45,6 +45,16 @@ router.post(
 	chatSearchController.heartbeat as RequestHandler,
 );
 
+router.post(
+	"/chat/start-direct",
+	chatSearchController.startDirectChat as RequestHandler,
+);
+
+router.post(
+	"/chat/accept-direct",
+	chatSearchController.acceptDirectChat as RequestHandler,
+);
+
 router.get("/", userController.searchUsers as RequestHandler);
 
 export default router;
