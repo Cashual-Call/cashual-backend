@@ -1,6 +1,6 @@
 {
 	"name": "cashual-chat-backend",
-	"version": "1.0.5",
+	"version": "1.1.0",
 	"main": "index.ts",
 	"author": "Arup Basak <email.arupbasak@gmail.com>",
 	"license": "MIT",

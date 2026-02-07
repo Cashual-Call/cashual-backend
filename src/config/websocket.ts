@@ -12,6 +12,9 @@ export enum ChatEvent {
 	USER_DISCONNECTED = "user_disconnected",
 	USER_CONNECTED = "user_connected",
 	FRIEND_REQUEST = "friend_request",
+	CALL_REQUEST = "call_request",
+	CALL_REQUEST_ACCEPTED = "call_request_accepted",
+	CALL_REQUEST_REJECTED = "call_request_rejected",
 	ERROR = "error",
 	RECONNECT = "reconnect",
 }

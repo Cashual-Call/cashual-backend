@@ -88,6 +88,23 @@ export function setupChatHandlers(io: Server) {
       chatRecieverController.userEvent(data),
     );
 
+    // Handle call request workflow
+    socket.on(ChatEvent.CALL_REQUEST, (data?: { requesterUsername?: string }) =>
+      chatRecieverController.callRequest(data),
+    );
+
+    socket.on(
+      ChatEvent.CALL_REQUEST_ACCEPTED,
+      (data?: { responderUsername?: string }) =>
+        chatRecieverController.callRequestAccepted(data),
+    );
+
+    socket.on(
+      ChatEvent.CALL_REQUEST_REJECTED,
+      (data?: { responderUsername?: string }) =>
+        chatRecieverController.callRequestRejected(data),
+    );
+
     // Handle custom room events - emit to other users in the same room
     socket.on("emit_to_room", (data: { eventName: string; payload: any }) =>
       chatRecieverController.emitToRoom(data.eventName, data.payload),

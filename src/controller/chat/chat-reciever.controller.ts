@@ -429,6 +429,66 @@ export class ChatReceiverController {
 		}
 	}
 
+	async callRequest(data?: { requesterUsername?: string }) {
+		try {
+			const requesterUsername = data?.requesterUsername || this.senderId;
+			const event = {
+				roomId: this.roomId,
+				requesterId: this.senderId,
+				requesterUsername,
+				timestamp: new Date().toISOString(),
+			};
+
+			this.socket.to(this.roomId).emit(ChatEvent.CALL_REQUEST, event);
+		} catch (error) {
+			console.error("Error sending call request:", error);
+			this.socket.emit(
+				ChatEvent.ERROR,
+				error instanceof Error ? error.message : "Failed to send call request",
+			);
+		}
+	}
+
+	async callRequestAccepted(data?: { responderUsername?: string }) {
+		try {
+			const responderUsername = data?.responderUsername || this.senderId;
+			const event = {
+				roomId: this.roomId,
+				responderId: this.senderId,
+				responderUsername,
+				timestamp: new Date().toISOString(),
+			};
+
+			this.socket.to(this.roomId).emit(ChatEvent.CALL_REQUEST_ACCEPTED, event);
+		} catch (error) {
+			console.error("Error accepting call request:", error);
+			this.socket.emit(
+				ChatEvent.ERROR,
+				error instanceof Error ? error.message : "Failed to accept call request",
+			);
+		}
+	}
+
+	async callRequestRejected(data?: { responderUsername?: string }) {
+		try {
+			const responderUsername = data?.responderUsername || this.senderId;
+			const event = {
+				roomId: this.roomId,
+				responderId: this.senderId,
+				responderUsername,
+				timestamp: new Date().toISOString(),
+			};
+
+			this.socket.to(this.roomId).emit(ChatEvent.CALL_REQUEST_REJECTED, event);
+		} catch (error) {
+			console.error("Error rejecting call request:", error);
+			this.socket.emit(
+				ChatEvent.ERROR,
+				error instanceof Error ? error.message : "Failed to reject call request",
+			);
+		}
+	}
+
 	async userEvent(data: { eventType: string; payload?: any }) {
 		try {
 			const event = {
