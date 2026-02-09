@@ -2,11 +2,11 @@ import { Router } from "express";
 import { verifyToken } from "../middleware/auth.middleware";
 import { redis } from "../lib/redis";
 import { NotificationService } from "../service/notification.service";
+import { AvailableUserService } from "../service/available-user.service";
 
 const router = Router();
-const SSE_USERS_SET = "sse:users";
-const SSE_USER_CONNECTIONS = "sse:user:connections";
 const SSE_CHANNEL_PREFIX = "sse:user:";
+const presenceService = new AvailableUserService("presence");
 
 router.get("/events", verifyToken, async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
@@ -21,15 +21,12 @@ router.get("/events", verifyToken, async (req, res) => {
     return;
   }
 
-  const connectionCount = await redis.hincrby(SSE_USER_CONNECTIONS, userId, 1);
-  if (connectionCount === 1) {
-    await redis.sadd(SSE_USERS_SET, userId);
-  }
+  await presenceService.incrementPresence(userId, username || "");
 
   res.write(
     `event: ping\n` +
       `data: ${JSON.stringify({
-        total_users: await redis.scard(SSE_USERS_SET),
+        total_users: await presenceService.getUserCount(),
         user: userId,
         username,
       })}\n\n`
@@ -38,7 +35,7 @@ router.get("/events", verifyToken, async (req, res) => {
   const channel = `${SSE_CHANNEL_PREFIX}${userId}`;
   const subscriber = redis.duplicate();
 
-  subscriber.on("message", (messageChannel, message) => {
+  subscriber.on("message", (messageChannel: string, message: string) => {
     if (messageChannel !== channel) return;
     try {
       const payload = JSON.parse(message);
@@ -53,11 +50,7 @@ router.get("/events", verifyToken, async (req, res) => {
   await NotificationService.sendUnsentNotifications(userId);
 
   req.on("close", async () => {
-    const remaining = await redis.hincrby(SSE_USER_CONNECTIONS, userId, -1);
-    if (remaining <= 0) {
-      await redis.hdel(SSE_USER_CONNECTIONS, userId);
-      await redis.srem(SSE_USERS_SET, userId);
-    }
+    await presenceService.decrementPresence(userId);
     try {
       await subscriber.unsubscribe(channel);
     } finally {

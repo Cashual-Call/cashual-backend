@@ -26,6 +26,7 @@ export class SearchController {
 		this.createPublicRoom = this.createPublicRoom.bind(this);
 		this.startDirectChat = this.startDirectChat.bind(this);
 		this.acceptDirectChat = this.acceptDirectChat.bind(this);
+		this.declineDirectChat = this.declineDirectChat.bind(this);
 	}
 
 	async startSearch(req: Request, res: Response) {
@@ -282,6 +283,73 @@ export class SearchController {
 				token: tokenForCurrent,
 				user: requesterUser,
 			},
+		});
+	}
+
+	async declineDirectChat(req: Request, res: Response) {
+		const userId = req.user?.id as string;
+		const { requestId } = req.body || {};
+
+		if (!userId) {
+			return res.status(401).json({ message: "Unauthorized" });
+		}
+
+		if (!requestId || typeof requestId !== "string") {
+			return res.status(400).json({ message: "Request ID is required" });
+		}
+
+		const raw = await redis.get(`chat:direct_request:${requestId}`);
+		if (!raw) {
+			return res.status(404).json({ message: "Chat request not found" });
+		}
+
+		const requestData = JSON.parse(raw) as {
+			requesterId: string;
+			targetId: string;
+		};
+
+		if (requestData.targetId !== userId) {
+			return res.status(403).json({ message: "Not authorized" });
+		}
+
+		const [currentUser, requesterUser] = await Promise.all([
+			prisma.user.findUnique({ where: { id: userId } }),
+			prisma.user.findUnique({ where: { id: requestData.requesterId } }),
+		]);
+
+		if (!currentUser || !requesterUser) {
+			return res.status(404).json({ message: "User not found" });
+		}
+
+		const currentUsername =
+			currentUser.displayUsername ||
+			currentUser.username ||
+			currentUser.name ||
+			currentUser.id;
+
+		await redis.del(`chat:direct_request:${requestId}`);
+
+		await NotificationService.createNotification(
+			requesterUser.id,
+			"Chat declined",
+			`${currentUsername} declined your chat request.`,
+			NotificationType.NEW_MESSAGE,
+			NotificationPriority.NORMAL,
+			{
+				type: "chat_request_declined",
+				requestId,
+				user: {
+					id: currentUser.id,
+					username: currentUsername,
+					avatarUrl: currentUser.avatarUrl,
+					name: currentUser.name,
+					isPro: currentUser.isPro,
+				},
+			},
+		);
+
+		return res.status(200).json({
+			message: "Chat request declined",
 		});
 	}
 

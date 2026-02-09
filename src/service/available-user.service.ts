@@ -3,6 +3,9 @@ import { generateToken } from "../middleware/socket.middleware";
 import { redis } from "../lib/redis";
 
 const USER_TTL = 120;
+const USER_FIELD_IS_SEARCHING = "isSearching";
+const USER_FIELD_IS_ONLINE = "isOnline";
+const USER_FIELD_CONNECTIONS = "connections";
 
 export class AvailableUserService {
 	private searchType: string;
@@ -128,6 +131,7 @@ export class AvailableUserService {
 		// 4) Create / update user hash and set TTL on the hash
 		pipeline.hset(userHashKey, "username", username || "");
 		pipeline.hset(userHashKey, "timestamp", String(now));
+		pipeline.hset(userHashKey, USER_FIELD_IS_SEARCHING, "true");
 		pipeline.expire(userHashKey, USER_TTL);
 
 		// 5) For each interest, add to interest ZSET (score = timestamp). This lets us prune stale members later.
@@ -150,8 +154,9 @@ export class AvailableUserService {
 		return userId;
 	}
 
-	async removeUser(userId: string) {
+	async removeUser(userId: string, options: { keepRecord?: boolean } = {}) {
 		const pipeline = redis.pipeline();
+		const userHashKey = `user:${this.searchType}:${userId}`;
 
 		// Get user's interests first
 		const interests = await redis.zrange(
@@ -162,7 +167,12 @@ export class AvailableUserService {
 
 		// Remove user from main ZSET (not SET)
 		pipeline.zrem(`users:${this.searchType}`, userId);
-		pipeline.del(`user:${this.searchType}:${userId}`);
+		if (options.keepRecord) {
+			pipeline.hset(userHashKey, USER_FIELD_IS_SEARCHING, "false");
+			pipeline.expire(userHashKey, USER_TTL);
+		} else {
+			pipeline.del(userHashKey);
+		}
 
 		// Remove user from all interest ZSETs (not SETs)
 		for (const interest of interests) {
@@ -173,6 +183,65 @@ export class AvailableUserService {
 		pipeline.del(`user_interests:${this.searchType}:${userId}`);
 
 		await pipeline.exec();
+	}
+
+	async incrementPresence(userId: string, username = ""): Promise<number> {
+		const userHashKey = `user:${this.searchType}:${userId}`;
+		const usersZKey = `users:${this.searchType}`;
+		const now = Date.now();
+		const connectionCount = await redis.hincrby(
+			userHashKey,
+			USER_FIELD_CONNECTIONS,
+			1,
+		);
+
+		const pipeline = redis.pipeline();
+		if (connectionCount === 1) {
+			pipeline.zadd(usersZKey, now, userId);
+		}
+		if (username) {
+			pipeline.hset(userHashKey, "username", username);
+		}
+		pipeline.hset(userHashKey, "timestamp", String(now));
+		pipeline.hset(userHashKey, USER_FIELD_IS_ONLINE, "true");
+		pipeline.expire(userHashKey, USER_TTL);
+		await pipeline.exec();
+
+		return connectionCount;
+	}
+
+	async decrementPresence(userId: string): Promise<number> {
+		const userHashKey = `user:${this.searchType}:${userId}`;
+		const usersZKey = `users:${this.searchType}`;
+		const remaining = await redis.hincrby(
+			userHashKey,
+			USER_FIELD_CONNECTIONS,
+			-1,
+		);
+
+		const pipeline = redis.pipeline();
+		if (remaining <= 0) {
+			pipeline.zrem(usersZKey, userId);
+			pipeline.hset(userHashKey, USER_FIELD_CONNECTIONS, "0");
+			pipeline.hset(userHashKey, USER_FIELD_IS_ONLINE, "false");
+		}
+		pipeline.expire(userHashKey, USER_TTL);
+		await pipeline.exec();
+
+		return Math.max(remaining, 0);
+	}
+
+	async getUserIds(): Promise<string[]> {
+		return redis.zrange(`users:${this.searchType}`, 0, -1);
+	}
+
+	async getUserCount(): Promise<number> {
+		return redis.zcard(`users:${this.searchType}`);
+	}
+
+	async isUserOnline(userId: string): Promise<boolean> {
+		const score = await redis.zscore(`users:${this.searchType}`, userId);
+		return score !== null;
 	}
 
 	async updateUserHeartbeat(userId: string) {

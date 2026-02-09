@@ -55,6 +55,11 @@ router.post(
 	chatSearchController.acceptDirectChat as RequestHandler,
 );
 
+router.post(
+	"/chat/decline-direct",
+	chatSearchController.declineDirectChat as RequestHandler,
+);
+
 router.get("/", userController.searchUsers as RequestHandler);
 
 export default router;

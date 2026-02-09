@@ -53,7 +53,7 @@ export class MatchService {
 	}
 
 	async removeUser(userId: string) {
-		await this.availableUserService.removeUser(userId);
+		await this.availableUserService.removeUser(userId, { keepRecord: true });
 	}
 
 	async updateUserHeartbeat(userId: string) {

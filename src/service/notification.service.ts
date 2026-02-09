@@ -5,10 +5,11 @@ import {
 	NotificationPriority as Priority,
 } from "../generated/client";
 import logger from "../config/logger";
-import { pubClient, redis } from "../lib/redis";
+import { pubClient } from "../lib/redis";
+import { AvailableUserService } from "./available-user.service";
 
-const SSE_USERS_SET = "sse:users";
 const SSE_CHANNEL_PREFIX = "sse:user:";
+const presenceService = new AvailableUserService("presence");
 
 export class NotificationService {
 	private static async sendNotification(notification: Notification) {
@@ -41,7 +42,7 @@ export class NotificationService {
 			metadata,
 		});
 		try {
-			const isSent = (await redis.sismember(SSE_USERS_SET, userId)) === 1;
+			const isSent = await presenceService.isUserOnline(userId);
 			if (!isSent) {
 				console.log("notification not sent to user", userId);
 			}
@@ -98,7 +99,7 @@ export class NotificationService {
 
 	static async sendUnsentNotifications(userId?: string) {
 		try {
-			const userIds = userId ? [userId] : await redis.smembers(SSE_USERS_SET);
+			const userIds = userId ? [userId] : await presenceService.getUserIds();
 
 			if (userIds.length === 0) return;
 

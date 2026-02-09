@@ -9,7 +9,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import "dotenv/config";
 import { setupWebSocketHandlers } from "./websocket";
-import { pubClient, redis, subClient } from "./lib/redis";
+import { pubClient, subClient } from "./lib/redis";
 import { prisma } from "./lib/prisma";
 import { addRecurringJob, cleanup as matchCleanup } from "./cron/match.cron";
 import {
@@ -27,9 +27,11 @@ import router from "./routes";
 import { instrument } from "@socket.io/admin-ui";
 import rateLimit from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
+import { AvailableUserService } from "./service/available-user.service";
 
 const app = express();
 const httpServer = createServer(app);
+const presenceService = new AvailableUserService("presence");
 
 const PORT = process.env.PORT || 8080;
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
@@ -94,7 +96,7 @@ app.use(errorHandler);
 
 // Health check endpoint with detailed system metrics
 app.get("/health", async (_, res) => {
-	const totalUserCount = await redis.scard("sse:users");
+	const totalUserCount = await presenceService.getUserCount();
 
 	const uptime = process.uptime();
 	const memoryUsage = process.memoryUsage();
