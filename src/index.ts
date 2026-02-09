@@ -9,7 +9,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import "dotenv/config";
 import { setupWebSocketHandlers } from "./websocket";
-import { pubClient, subClient } from "./lib/redis";
+import { pubClient, redis, subClient } from "./lib/redis";
 import { prisma } from "./lib/prisma";
 import { addRecurringJob, cleanup as matchCleanup } from "./cron/match.cron";
 import {
@@ -22,7 +22,6 @@ import {
 } from "./cron/subscription.cron";
 import { auth } from "./lib/auth";
 import { toNodeHandler } from "better-auth/node";
-import { MemoryService } from "./service/memory.service";
 import { errorHandler } from "./utils";
 import router from "./routes";
 import { instrument } from "@socket.io/admin-ui";
@@ -95,7 +94,7 @@ app.use(errorHandler);
 
 // Health check endpoint with detailed system metrics
 app.get("/health", async (_, res) => {
-	const totalUserCount = MemoryService.totalClients();
+	const totalUserCount = await redis.scard("sse:users");
 
 	const uptime = process.uptime();
 	const memoryUsage = process.memoryUsage();

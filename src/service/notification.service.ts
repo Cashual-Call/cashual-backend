@@ -5,17 +5,16 @@ import {
 	NotificationPriority as Priority,
 } from "../generated/client";
 import logger from "../config/logger";
-import { MemoryService as Memory } from "./memory.service";
+import { pubClient, redis } from "../lib/redis";
+
+const SSE_USERS_SET = "sse:users";
+const SSE_CHANNEL_PREFIX = "sse:user:";
 
 export class NotificationService {
-	private static sendNotification(notification: Notification) {
+	private static async sendNotification(notification: Notification) {
 		try {
-			const client = Memory.getClient(notification.userId);
-			if (!client || client.writableEnded) return;
-
-			client.write(
-				`event: notification\n` + `data: ${JSON.stringify(notification)}\n\n`,
-			);
+			const channel = `${SSE_CHANNEL_PREFIX}${notification.userId}`;
+			await pubClient.publish(channel, JSON.stringify(notification));
 			console.log("notification sent to user", notification.userId);
 		} catch (error) {
 			logger.error(
@@ -42,9 +41,9 @@ export class NotificationService {
 			metadata,
 		});
 		try {
-			const isSent = Memory.clientExists(userId);
+			const isSent = (await redis.sismember(SSE_USERS_SET, userId)) === 1;
 			if (!isSent) {
-				console.log("notification not sent to user", Memory.getAllClientIds());
+				console.log("notification not sent to user", userId);
 			}
 			const notification = await prisma.notification.create({
 				data: {
@@ -59,7 +58,7 @@ export class NotificationService {
 			});
 
 			if (isSent) {
-				this.sendNotification(notification);
+				await this.sendNotification(notification);
 			}
 			return notification;
 		} catch (error) {
@@ -99,7 +98,7 @@ export class NotificationService {
 
 	static async sendUnsentNotifications(userId?: string) {
 		try {
-			const userIds = userId ? [userId] : Memory.getAllClientIds();
+			const userIds = userId ? [userId] : await redis.smembers(SSE_USERS_SET);
 
 			if (userIds.length === 0) return;
 
@@ -112,16 +111,16 @@ export class NotificationService {
 				},
 			});
 
-			notifications.forEach((notification) => {
+			for (const notification of notifications) {
 				try {
-					this.sendNotification(notification);
+					await this.sendNotification(notification);
 				} catch (err) {
 					logger.error(
 						`Error sending unsent notification to user ${notification.userId}:`,
 						err,
 					);
 				}
-			});
+			}
 		} catch (error) {
 			logger.error("Failed to send unsent notifications:", error);
 			throw new Error(`Failed to send unsent notifications: ${error}`);
