@@ -12,16 +12,20 @@ const SSE_CHANNEL_PREFIX = "sse:user:";
 const presenceService = new AvailableUserService("presence");
 
 export class NotificationService {
-	private static async sendNotification(notification: Notification) {
+	private static async sendNotification(
+		notification: Notification,
+	): Promise<boolean> {
 		try {
 			const channel = `${SSE_CHANNEL_PREFIX}${notification.userId}`;
 			await pubClient.publish(channel, JSON.stringify(notification));
 			console.log("notification sent to user", notification.userId);
+			return true;
 		} catch (error) {
 			logger.error(
 				`Error sending notification to user ${notification.userId}:`,
 				error,
 			);
+			return false;
 		}
 	}
 
@@ -114,7 +118,12 @@ export class NotificationService {
 
 			for (const notification of notifications) {
 				try {
-					await this.sendNotification(notification);
+					const sent = await this.sendNotification(notification);
+					if (sent) {
+						await prisma.notification.delete({
+							where: { id: notification.id },
+						});
+					}
 				} catch (err) {
 					logger.error(
 						`Error sending unsent notification to user ${notification.userId}:`,
