@@ -322,6 +322,11 @@ export class ChatReceiverController {
 				// Remove socket from room
 				await redis.srem(`chat:rooms:${roomId}`, this.socket.id);
 
+				// Keep friend chats active even if a socket disconnects.
+				if (roomId.includes("|")) {
+					continue;
+				}
+
 				const pendingKey = this.getPendingDisconnectKey(roomId);
 				await redis.set(
 					pendingKey,
