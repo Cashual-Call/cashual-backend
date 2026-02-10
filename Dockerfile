@@ -26,3 +26,4 @@ RUN bun run build
 
 # Start the server (uses the same script as before)
 CMD ["bun", "run", "start"]
+
